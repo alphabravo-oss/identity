@@ -133,12 +133,23 @@ func loginPage(w http.ResponseWriter, r *http.Request) {
 
 func password(w http.ResponseWriter, r *http.Request) {
 	ar := r.FormValue("authRequest")
-	s, err := createSession(map[string]any{
+	checks := map[string]any{
 		"user":     map[string]string{"loginName": r.FormValue("username")},
 		"password": map[string]string{"password": r.FormValue("password")},
-	})
+	}
+	code := r.FormValue("code")
+	if code != "" {
+		checks["totp"] = map[string]string{"code": code}
+	}
+	s, err := createSession(checks)
 	if err != nil {
-		render(w, r, view{Step: "login", AuthRequest: ar, Err: "Incorrect username or password."})
+		render(w, r, view{Step: "login", AuthRequest: ar, Err: "The password or verification code did not work."})
+		return
+	}
+	// A successful combined check has verified both factors in the engine.
+	// Empty codes retain the enrollment and separate second-factor flow below.
+	if code != "" {
+		done(w, r, ar, s)
 		return
 	}
 	var m struct{ AuthMethodTypes []string }

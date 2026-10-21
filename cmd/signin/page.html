@@ -54,6 +54,7 @@ details summary { list-style: none; } details summary::-webkit-details-marker { 
     <input type="hidden" name="authRequest" value="{{.AuthRequest}}">
     <label for="u">Username or email</label><input id="u" name="username" autocomplete="username" required autofocus>
     <label for="p">Password</label><input id="p" name="password" type="password" autocomplete="current-password" required>
+    <label for="login-code">Authenticator code (if set up)</label><input id="login-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}">
     <button type="submit">Continue</button>
   </form>
   <p><a href="/signin/reset">Forgot your password?</a></p>
