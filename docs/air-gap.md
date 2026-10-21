@@ -27,3 +27,10 @@ Uninstall retains the database and immutable master key. On reinstall, existing
 retained resources are adopted without running destructive pre-install hooks against
 them. A pre-existing master-key Secret managed outside this release is consumed without
 claiming ownership. Its `masterkey` data must be exactly 32 bytes and backed up.
+
+The upstream chart's secret-cleanup Job is disabled: its default would remove the
+administrator machine credentials on uninstall even while the database is retained.
+Delete the namespace explicitly when intentionally destroying an installation.
+For non-k3s Service CIDRs, adjust the engine HTTP client deny-list carve-out to the
+actual Service CIDR while retaining metadata, loopback and unrelated private-network
+blocks. The supplied tested carve-out is 10.43.0.0/16.

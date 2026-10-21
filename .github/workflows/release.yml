@@ -61,8 +61,12 @@ jobs:
           service=os.environ['SERVICE']
           marker='    repository: ghcr.io/alphabravo-oss/identity/'+service
           start=s.index(marker)
-          end=s.index("    digest: ''",start)
-          s=s[:end]+'    digest: '+os.environ['DIGEST']+s[end+len("    digest: ''"):]
+          tag_start=s.index('    tag:',start)
+          tag_end=s.index('\n',tag_start)
+          s=s[:tag_start]+'    tag: '+os.environ['VERSION']+s[tag_end:]
+          digest_start=s.index('    digest:',start)
+          digest_end=s.index('\n',digest_start)
+          s=s[:digest_start]+'    digest: '+os.environ['DIGEST']+s[digest_end:]
           open(p,'w').write(s)
           PY
           done
@@ -70,7 +74,7 @@ jobs:
           helm repo add zitadel https://charts.zitadel.com
           helm dependency build chart/identity --skip-refresh
           helm lint --strict chart/identity
-          helm package chart/identity --destination dist --version "$VERSION"
+          helm package chart/identity --destination dist --version "$VERSION" --app-version "$VERSION"
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "dist/identity-$VERSION.tgz" oci://ghcr.io/alphabravo-oss/charts 2>&1 | tee dist/chart-push.txt
           digest=$(awk '/Digest:/ {print $2}' dist/chart-push.txt)

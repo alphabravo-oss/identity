@@ -180,3 +180,5 @@ zitadel:
   login:
     enabled: false
   fullnameOverride: identity-engine
+  cleanupJob:
+    enabled: false
