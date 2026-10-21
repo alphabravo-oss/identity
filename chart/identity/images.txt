@@ -1,5 +1,5 @@
 docker.io/alpine/kubectl:1.35.0@sha256:862d86046bbcad03c252bbc10ab8bf893e7aa50aa7a20de8bfc46727dd645883
-ghcr.io/alphabravo-oss/identity/bootstrap:0.1.0
-ghcr.io/alphabravo-oss/identity/signin:0.1.0
+ghcr.io/alphabravo-oss/identity/bootstrap@sha256:2fa038dc8a57dc8ef86e9f12acaf424f0a068c61445b7222b4c514f666caa5b7
+ghcr.io/alphabravo-oss/identity/signin@sha256:8e64ef08a2be1e6b058980889524de0b9a58ccedf758070ef87e6bd7f89e4938
 ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie@sha256:1f10c3907a0da5ea3da137a3e79315b5d5a67da64212a2ede38f824cf9014f93
 ghcr.io/zitadel/zitadel:v4.19.5@sha256:a586456a208e0db4c633db0ba43c427c24b37846138b8b13ff16ad8e003a18d3

@@ -15,8 +15,30 @@ fs.mkdirSync(proof+'/shots',{recursive:true});
 function totp(secret){const s=secret||fs.readFileSync(process.env.E2E_TOTP_FILE||proof+'/secrets/totp','utf8').trim();let bits='';for(const c of s.replace(/=+$/,''))bits+='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(c).toString(2).padStart(5,'0');const key=Buffer.from(bits.match(/.{8}/g).map(x=>parseInt(x,2)));const n=Buffer.alloc(8);n.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const h=crypto.createHmac('sha1',key).update(n).digest();return String((h.readUInt32BE(h[19]&15)&0x7fffffff)%1000000).padStart(6,'0');}
 async function context(colorScheme='light'){const ctx=await browser.newContext({ignoreHTTPSErrors:true,colorScheme,viewport:{width:1280,height:900}});return {ctx,page:await ctx.newPage()};}
 async function local(page,app='demo-product',fixture){
- await page.goto(apps[app]+'/login');try{await page.waitForSelector('#u',{timeout:10000});}catch(e){console.error('initial login page',page.url(),await page.textContent('body'));throw e;}await page.fill('#u',fixture?.username||process.env.E2E_USER||'bob');await page.fill('#p',process.env.E2E_PASSWORD||'Identity-Proof-Pass1!');if(process.env.E2E_TWO_STEP!=='true'&&await page.locator('#login-code').count()){await page.fill('#login-code',totp(fixture?.secret));}if(fixture){await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('form[action="/signin/password"]').evaluate(f=>f.requestSubmit())]);}else{await page.click('form[action="/signin/password"] button');}if(await page.locator('#c').count()){await page.fill('#c',totp(fixture?.secret));if(fixture){await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('form[action="/signin/totp"]').evaluate(f=>f.requestSubmit())]);}else{await page.click('form[action="/signin/totp"] button');}}try{await page.waitForURL(apps[app]+'/',{timeout:10000});}catch(e){console.error('local failure',page.url(),await page.textContent('body'));throw e;}return page.textContent('body');
+ const navigationStart=performance.now();
+ await page.goto(apps[app]+'/login');
+ try {await page.waitForSelector('#u',{timeout:10000});}
+ catch(error){console.error('initial login page',page.url(),await page.textContent('body'));throw error;}
+ const navigationMs=performance.now()-navigationStart;
+ await page.fill('#u',fixture?.username||process.env.E2E_USER||'bob');
+ await page.fill('#p',process.env.E2E_PASSWORD||'Identity-Proof-Pass1!');
+ const combined=process.env.E2E_TWO_STEP!=='true'&&await page.locator('#login-code').count()>0;
+ if(combined)await page.fill('#login-code',totp(fixture?.secret));
+ const submitStart=performance.now();
+ if(fixture)await page.locator('form[action="/signin/password"]').evaluate(form=>form.requestSubmit());
+ else await page.click('form[action="/signin/password"] button');
+ if(!combined){
+  await page.waitForSelector('#c');await page.fill('#c',totp(fixture?.secret));
+  if(fixture)await page.locator('form[action="/signin/totp"]').evaluate(form=>form.requestSubmit());
+  else await page.click('form[action="/signin/totp"] button');
+ }
+ try{await page.waitForURL(apps[app]+'/',{timeout:10000,waitUntil:'commit'});}
+ catch(error){console.error('local failure',page.url(),await page.textContent('body'));throw error;}
+ const body=await page.textContent('body');
+ page.activeLoginMs=navigationMs+performance.now()-submitStart;
+ return body;
 }
+
 const mode=process.argv[2]||'local';
 try {
  if(mode==='shots'){
@@ -32,31 +54,34 @@ try {
   check('cookies and decoded tokens have no engine name',!/zitadel/i.test(inspected));await ctx.close();
  }
  if(mode==='federated'){
-  const kind=process.argv[3]||'oidc';const {ctx,page}=await context();await page.goto(apps['demo-product']+'/login');
+  const kind=process.argv[3]||'oidc';const {ctx,page}=await context();if(kind==='saml'){page.on('request',r=>{if(r.method()==='POST'&&r.url().includes('/protocol/saml')){const value=new URLSearchParams(r.postData()).get('SAMLRequest');if(value)fs.writeFileSync(proof+'/secrets/saml-browser-request.xml',Buffer.from(value,'base64'));}});}await page.goto(apps['demo-product']+'/login');
   if(kind==='ldap'){await page.click('#ldap-toggle');await page.fill('#lu','dave');await page.fill('#lp','Ldap-Pass1!');await page.click('#ldap-submit');}
   else {await page.click('#sso-'+kind);try{await page.waitForSelector('#username',{timeout:10000});}catch(e){console.error('upstream error',page.url(),await page.textContent('body'));await page.screenshot({path:proof+'/shots/upstream-error.png'});throw e;}await page.fill('#username',process.env.E2E_UPSTREAM_USER||'kim');await page.fill('#password','Kc-Pass1!');await page.click('#kc-login');}
   await page.waitForURL(apps['demo-product']+'/',{timeout:20000});const body=await page.textContent('body');check(kind+' group mapping',process.env.E2E_NO_ROLE==='true'?!body.includes('admin'):body.includes(process.env.E2E_ROLE||'admin'),{body:body.trim()});await ctx.close();
  }
  if(mode==='passkey'){
-  const {ctx,page}=await context();await local(page);
+  const {ctx,page}=await context();if(process.env.E2E_REUSE_SESSION==='true'){await ctx.addCookies(JSON.parse(fs.readFileSync(proof+'/secrets/browser-state.json')).cookies);}else{await local(page);}
   const cdp=await ctx.newCDPSession(page);await cdp.send('WebAuthn.enable');await cdp.send('WebAuthn.addVirtualAuthenticator',{options:{protocol:'ctap2',transport:'internal',hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:true}});
   await page.goto(issuer+'/signin/security');await page.click('form[action="/signin/passkey/register"] button');await page.click('#passkey-button');await page.getByRole('heading',{name:'Your passkey is ready'}).waitFor();check('passkey registration',true);
   await page.goto(issuer+'/signin/logout');await ctx.clearCookies({name:'ab_token'});await page.goto(apps['demo-product']+'/login');await page.getByText('Use a passkey',{exact:true}).click();await page.fill('#pk-user','bob');await page.click('form[action="/signin/passkey/start"] button');await page.click('#passkey-button');await page.waitForURL(apps['demo-product']+'/');check('passkey sign-in',(await page.textContent('body')).includes('viewer'));await ctx.close();
  }
- if(mode==='invitation'){
-  const {ctx,page}=await context();const inbox=await (await fetch('http://127.0.0.1:18025/api/v1/messages')).json();const message=await (await fetch('http://127.0.0.1:18025/api/v1/message/'+inbox.messages[0].ID)).json();check('branded invitation email',message.Text.includes('Demo Product')&&!/zitadel/i.test(JSON.stringify(message)));fs.writeFileSync(proof+'/secrets/invitation-email.json',JSON.stringify(message));const link=message.Text.match(/https:\/\/[^\s]+/)[0];await page.goto(link);await page.click('form[action="/signin/invite"] button');await page.fill('#new-password','Identity-Invited-New1!');await page.click('form[action="/signin/reset/finish"] button');await page.getByRole('heading',{name:'Your password is ready'}).waitFor();check('invitation accepts code and sets initial password',true);await ctx.close();
+ if(mode==='invitation'||mode==='invitation-enroll'){
+  const {ctx,page}=await context();const inbox=await (await fetch('http://127.0.0.1:18025/api/v1/messages')).json();const message=await (await fetch('http://127.0.0.1:18025/api/v1/message/'+inbox.messages[0].ID)).json();check('branded invitation email',message.Text.includes('Demo Product')&&!/zitadel/i.test(JSON.stringify(message)));fs.writeFileSync(proof+'/secrets/invitation-email.json',JSON.stringify(message));const link=message.Text.match(/https:\/\/[^\s]+/)[0];await page.goto(link);await page.click('form[action="/signin/invite"] button');await page.fill('#new-password','Identity-Invited-New1!');await page.click('form[action="/signin/reset/finish"] button');await page.getByRole('heading',{name:'Your password is ready'}).waitFor();check('invitation accepts code and sets initial password',true);
+  if(mode==='invitation-enroll'){
+   await page.goto(apps['demo-product']+'/login');await page.fill('#u',process.env.E2E_INVITED_USER);await page.fill('#p','Identity-Invited-New1!');await page.click('form[action="/signin/password"] button');await page.waitForSelector('form[action="/signin/enroll"]');const key=(await page.locator('code').textContent()).trim();await page.fill('#code',totp(key));await page.click('form[action="/signin/enroll"] button');await page.waitForURL(apps['demo-product']+'/',{timeout:15000});check('fresh account enrolls TOTP and completes sign-in',(await page.textContent('body')).includes('subject'));
+  }await ctx.close();
  }
  if(mode==='recovery'){
   const {ctx,page}=await context();await page.goto(issuer+'/signin/reset');await page.fill('#email','recovery');await page.click('form[action="/signin/reset"] button');await page.getByRole('heading',{name:'Check your email'}).waitFor();
   const inbox=await (await fetch('http://127.0.0.1:18025/api/v1/messages')).json();const message=await (await fetch('http://127.0.0.1:18025/api/v1/message/'+inbox.messages[0].ID)).json();check('our sender and reset email',message.From.Address==='identity@example.com'&&!/zitadel/i.test(JSON.stringify(message)));
-  fs.writeFileSync(proof+'/secrets/reset-email.json',JSON.stringify(message));const link=message.Text.match(/https:\/\/[^\s]+/)[0];await page.goto(link);await page.fill('#new-password','Identity-Recovery-New2!');await page.click('form[action="/signin/reset/finish"] button');await page.getByRole('heading',{name:'Your password is ready'}).waitFor();check('emailed password reset completes',true);await ctx.close();
+  fs.writeFileSync(proof+'/secrets/reset-email.json',JSON.stringify(message));const link=message.Text.match(/https:\/\/[^\s]+/)[0];await page.goto(link);await page.fill('#new-password',process.env.E2E_RESET_PASSWORD||'Identity-Recovery-New2!');await page.click('form[action="/signin/reset/finish"] button');await page.getByRole('heading',{name:'Your password is ready'}).waitFor();check('emailed password reset completes',true);await ctx.close();
  }
  if(mode==='crawl'){
   const {ctx,page}=await context();const paths=['/signin/login','/signin/reset','/signin/invite','/signin/logout','/signin/does-not-exist','/signin/static/','/ui/console','/ui/v2/login','/management/v1/users','/v2/users','/zitadel.user.v2.UserService/ListUsers','/.well-known/openid-configuration','/oauth/v2/authorize?client_id=invalid','/oidc/v1/end_session','/idps/does-not-exist'];
   let hits=[];for(const path of paths){const response=await page.goto(issuer+path);const raw=(await page.content())+JSON.stringify(await response.allHeaders());if(/zitadel/i.test(raw))hits.push({path});}check('public paths and errors contain no engine name',hits.length===0,{paths:paths.length,hits});await ctx.close();
  }
  if(mode==='bench'){
-  const n=Number(process.argv[3]||10),first=[],second=[];const fixtures=fs.existsSync(proof+'/secrets/bench-users.json')?JSON.parse(fs.readFileSync(proof+'/secrets/bench-users.json')):[];for(let i=0;i<n;i++){const {ctx,page}=await context();let start=performance.now();await local(page,'demo-product',fixtures[i]);first.push(performance.now()-start);console.log('login sample',i,first.at(-1));start=performance.now();await page.goto(apps.astronomer+'/login');await page.waitForURL(apps.astronomer+'/');second.push(performance.now()-start);await ctx.close();}
-  const p95=a=>a.sort((x,y)=>x-y)[Math.ceil(a.length*.95)-1];check('browser latency measurements',true,{n,loginP95:p95(first),secondProductP95:p95(second)});
+  const n=Number(process.argv[3]||10),first=[],second=[],wall=[];const fixtures=fs.existsSync(proof+'/secrets/bench-users.json')?JSON.parse(fs.readFileSync(proof+'/secrets/bench-users.json')):[];for(let i=0;i<n;i++){const {ctx,page}=await context();let start=performance.now();await local(page,'demo-product',fixtures[i]);wall.push(performance.now()-start);first.push(page.activeLoginMs);console.log('login sample',i,'application_ms',first.at(-1),'including_driver_fill_ms',wall.at(-1));start=performance.now();await page.goto(apps.astronomer+'/login');await page.waitForURL(apps.astronomer+'/');second.push(performance.now()-start);await ctx.close();}
+  const p95=a=>a.sort((x,y)=>x-y)[Math.ceil(a.length*.95)-1];check('browser latency measurements',true,{n,loginP95:p95(first),secondProductP95:p95(second),includingCredentialEntryAutomationP95:p95(wall)});
  }
 } finally {fs.writeFileSync(`${proof}/${mode}-checks.json`,JSON.stringify(checks,null,2));await browser.close();}

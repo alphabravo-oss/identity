@@ -39,3 +39,13 @@ Releases use the manually dispatched `release` Actions workflow: test, build exa
 two images, gate with Grype at High, push, keyless-sign image digests, pin and publish
 the OCI chart, and keyless-sign its digest. Complete live proof against those digests
 before creating the matching source tag; pushing the tag does not rebuild artifacts.
+
+The v0.1.0 published build passed a live isolated-cluster proof: 100 logins with
+zero failures during an engine replica deletion, 123.87 ms password/TOTP p95,
+63.76 ms silent-SSO p95, and 14.28–14.46 MiB sign-in RSS. RP verification measured
+0.890 µs memoized and 57.26 µs first sighting. Browser application login p95 was
+377.76 ms excluding automated credential entry; complete automation wall-time
+p95 was 426.63 ms. Password reset, invitations, first TOTP enrollment, passkeys,
+LDAP/OIDC group removal, signed SAML and engine-outage token validation passed.
+The [publishing run](https://github.com/alphabravo-oss/identity/actions/runs/39532631028)
+contains the Grype reports, immutable digests and keyless signing steps.

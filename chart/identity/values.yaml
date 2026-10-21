@@ -7,11 +7,11 @@ images:
   signin:
     repository: ghcr.io/alphabravo-oss/identity/signin
     tag: 0.1.0
-    digest: ''
+    digest: sha256:8e64ef08a2be1e6b058980889524de0b9a58ccedf758070ef87e6bd7f89e4938
   bootstrap:
     repository: ghcr.io/alphabravo-oss/identity/bootstrap
     tag: 0.1.0
-    digest: ''
+    digest: sha256:2fa038dc8a57dc8ef86e9f12acaf424f0a068c61445b7222b4c514f666caa5b7
 signin:
   replicas: 2
   requireTOTP: true
