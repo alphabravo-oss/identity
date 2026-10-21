@@ -1,6 +1,7 @@
 providers:
   existingSecret: ''
 products: []
+imagePullSecrets: []
 organization: AlphaBravo
 secretPrefix: identity-product-
 images:
@@ -27,11 +28,18 @@ database:
 ingress:
   enabled: true
   className: traefik
+  annotations: {}
   tlsSecretName: identity-tls
 networkPolicy:
   enabled: true
   apiServerCIDRs:
   - 10.43.0.1/32
+  # Explicit ingress-controller peers; override for nginx or another controller.
+  ingressPeers:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
+  ingressPorts: [{port: 8443}, {port: 8000}]
+  databaseOperatorNamespace: cnpg-system
   upstreams: []
 monitoring:
   enabled: false

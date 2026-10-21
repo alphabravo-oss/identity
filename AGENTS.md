@@ -13,7 +13,8 @@ last-good JWKS, encrypted HttpOnly cookies, CSRF and required MFA. No SPA.
 Registry additions are generic: never special-case a product in application logic.
 Store create-only credentials before proceeding, back up Secrets with the database,
 and fail explicitly if credential persistence is unavailable. Public APIs live in pkg;
-SDK types remain internal. Exactly two shipped images: signin and bootstrap.
+SDK types remain internal. Exactly two owned service images: signin and bootstrap. Vendor rebuild recipes
+live under third_party, preserve pinned source versions and satisfy the Go floor.
 
 Conventional commits must end with:
 Co-Authored-By: Codex <noreply@openai.com>

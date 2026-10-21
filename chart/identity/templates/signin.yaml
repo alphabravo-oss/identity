@@ -8,10 +8,13 @@ spec:
     matchLabels: {app: "{{ include "identity.name" . }}-signin"}
   template:
     metadata:
-      labels: {app: "{{ include "identity.name" . }}-signin", app.kubernetes.io/component: identity-signin}
+      labels: {app: "{{ include "identity.name" . }}-signin", app.kubernetes.io/component: identity-signin, app.kubernetes.io/name: identity, app.kubernetes.io/instance: {{ .Release.Name }}}
       annotations:
-        checksum/products: {{ .Values.products | toJson | sha256sum }}
+        checksum/products: {{ tpl (.Values.products | toJson) . | sha256sum }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
       securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532}
@@ -45,7 +48,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "identity.name" . }}-signin
-  labels: {app.kubernetes.io/component: identity-signin}
+  labels: {app.kubernetes.io/component: identity-signin, app.kubernetes.io/name: identity, app.kubernetes.io/instance: {{ .Release.Name }}}
 spec:
   selector: {app: "{{ include "identity.name" . }}-signin"}
   ports: [{name: http, port: 8080}, {name: claims, port: 8090}]
