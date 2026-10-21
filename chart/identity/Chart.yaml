@@ -1,0 +1,11 @@
+apiVersion: v2
+name: identity
+version: 0.1.0
+appVersion: 0.1.0
+description: Shared AlphaBravo identity, product registration and branded sign-in
+type: application
+kubeVersion: '>=1.30.0-0'
+dependencies:
+  - name: zitadel
+    version: 10.4.0
+    repository: https://charts.zitadel.com

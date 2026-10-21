@@ -1,0 +1,75 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Image and chart version without v
+        required: true
+        default: 0.1.0
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test -race ./...
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@v3
+      - uses: azure/setup-helm@v4.3.1
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin v0.121.0
+      - name: Build, gate, push and sign
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          export VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          make images
+          mkdir -p dist
+          for service in signin bootstrap; do
+            image="ghcr.io/alphabravo-oss/identity/$service:$VERSION"
+            grype "docker:$image" --fail-on high -o json > "dist/$service-grype.json"
+            docker push "$image"
+            digest=$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')
+            cosign sign --yes "$image@$digest"
+            echo "$service $digest" >> dist/digests.txt
+            SERVICE="$service" DIGEST="$digest" python3 - <<'PY'
+          import os
+          p='chart/identity/values.yaml'
+          s=open(p).read()
+          service=os.environ['SERVICE']
+          marker='    repository: ghcr.io/alphabravo-oss/identity/'+service
+          start=s.index(marker)
+          end=s.index("    digest: ''",start)
+          s=s[:end]+'    digest: '+os.environ['DIGEST']+s[end+len("    digest: ''"):]
+          open(p,'w').write(s)
+          PY
+          done
+          helm dependency build chart/identity
+          helm lint --strict chart/identity
+          helm package chart/identity --destination dist --version "$VERSION"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "dist/identity-$VERSION.tgz" oci://ghcr.io/alphabravo-oss/charts 2>&1 | tee dist/chart-push.txt
+          digest=$(awk '/Digest:/ {print $2}' dist/chart-push.txt)
+          cosign sign --yes "ghcr.io/alphabravo-oss/charts/identity@$digest"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-evidence
+          path: dist/

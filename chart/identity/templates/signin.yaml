@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "identity.name" . }}-signin
+spec:
+  replicas: {{ .Values.signin.replicas }}
+  selector:
+    matchLabels: {app: "{{ include "identity.name" . }}-signin"}
+  template:
+    metadata:
+      labels: {app: "{{ include "identity.name" . }}-signin", app.kubernetes.io/component: identity-signin}
+      annotations:
+        checksum/products: {{ .Values.products | toJson | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532}
+      containers:
+        - name: signin
+          image: {{ include "identity.image" .Values.images.signin | quote }}
+          ports: [{name: http, containerPort: 8080}, {name: claims, containerPort: 8090}]
+          resources: {requests: {cpu: 10m, memory: 16Mi}, limits: {memory: 64Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          lifecycle: {preStop: {sleep: {seconds: 5}}}
+          readinessProbe: {httpGet: {path: /signin/healthz, port: http}, periodSeconds: 3}
+          livenessProbe: {httpGet: {path: /signin/healthz, port: http}, periodSeconds: 15}
+          env:
+            - {name: ENGINE_API, value: "http://{{ .Values.zitadel.fullnameOverride }}:8080"}
+            - {name: ENGINE_HOST, value: {{ .Values.zitadel.zitadel.configmapConfig.ExternalDomain | quote }}}
+            - {name: PUBLIC_BASE, value: "https://{{ .Values.zitadel.zitadel.configmapConfig.ExternalDomain }}/signin"}
+            - {name: LOGIN_PAT_FILE, value: /runtime/login-client.pat}
+            - {name: COOKIE_KEY_FILE, value: /runtime/cookie-key}
+            - {name: CLAIMS_KEY_FILE, value: /runtime/claims-key}
+            - {name: REGISTRY_FILE, value: /runtime/registry.json}
+            - {name: REQUIRE_TOTP, value: {{ .Values.signin.requireTOTP | quote }}}
+            - {name: SMTP_ADDRESS, value: {{ .Values.signin.smtp.address | quote }}}
+            - {name: SMTP_FROM, value: {{ .Values.signin.smtp.from | quote }}}
+            - {name: GOMEMLIMIT, value: 24MiB}
+          volumeMounts: [{name: runtime, mountPath: /runtime, readOnly: true}]
+      volumes:
+        - name: runtime
+          secret: {secretName: "{{ include "identity.name" . }}-runtime"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "identity.name" . }}-signin
+  labels: {app.kubernetes.io/component: identity-signin}
+spec:
+  selector: {app: "{{ include "identity.name" . }}-signin"}
+  ports: [{name: http, port: 8080}, {name: claims, port: 8090}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "identity.name" . }}-signin
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: "{{ include "identity.name" . }}-signin"}

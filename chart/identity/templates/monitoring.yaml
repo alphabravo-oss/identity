@@ -1,0 +1,24 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "identity.name" . }}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: zitadel}
+  endpoints: [{port: http, path: /debug/metrics, interval: 30s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "identity.name" . }}
+spec:
+  groups:
+    - name: identity
+      rules:
+        - alert: IdentityReplicaUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="{{ .Release.Namespace }}",deployment="{{ .Values.zitadel.fullnameOverride }}"} < 2
+          for: 5m
+          labels: {severity: warning}
+          annotations: {summary: Identity has lost replica redundancy}
+{{- end }}

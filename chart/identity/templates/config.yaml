@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "identity.name" . }}-products
+data:
+  products.json: {{ .Values.products | toJson | quote }}
+---
+{{- if .Values.database.create }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.database.name }}
+spec:
+  instances: {{ .Values.database.instances }}
+  imageName: {{ .Values.database.image | quote }}
+  storage: {size: {{ .Values.database.size }}}
+  bootstrap:
+    initdb: {database: zitadel, owner: zitadel}
+  postgresql:
+    parameters: {shared_buffers: 64MB, max_connections: "100"}
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 512Mi}
+---
+{{- end }}
+{{- $old := lookup "v1" "Secret" .Release.Namespace .Values.zitadel.zitadel.masterkeySecretName }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.zitadel.zitadel.masterkeySecretName }}
+  annotations: {helm.sh/resource-policy: keep}
+type: Opaque
+data:
+  masterkey: {{ if $old }}{{ index $old.data "masterkey" }}{{ else }}{{ randAlphaNum 32 | b64enc }}{{ end }}

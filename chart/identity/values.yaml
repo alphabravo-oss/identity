@@ -1,0 +1,183 @@
+global:
+  identity:
+    domain: identity.example.com
+    otpIssuer: AlphaBravo
+products: []
+organization: AlphaBravo
+secretPrefix: identity-product-
+images:
+  signin:
+    repository: ghcr.io/alphabravo-oss/identity/signin
+    tag: 0.1.0
+    digest: ''
+  bootstrap:
+    repository: ghcr.io/alphabravo-oss/identity/bootstrap
+    tag: 0.1.0
+    digest: ''
+signin:
+  replicas: 2
+  requireTOTP: true
+  smtp:
+    address: ''
+    from: AlphaBravo <identity@example.com>
+database:
+  create: true
+  name: identity-db
+  instances: 1
+  size: 2Gi
+  image: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie@sha256:1f10c3907a0da5ea3da137a3e79315b5d5a67da64212a2ede38f824cf9014f93
+ingress:
+  enabled: true
+  className: traefik
+  tlsSecretName: identity-tls
+networkPolicy:
+  enabled: true
+  apiServerCIDRs:
+  - 10.43.0.1/32
+  upstreams: []
+monitoring:
+  enabled: false
+zitadel:
+  replicaCount: 2
+  image:
+    tag: v4.19.5@sha256:a586456a208e0db4c633db0ba43c427c24b37846138b8b13ff16ad8e003a18d3
+  tools:
+    wait4x:
+      image:
+        tag: 3.6@sha256:bec7ac18547781d854562c3729d3195c3880116d6758c49fdf4573ad58805f14
+    kubectl:
+      image:
+        tag: 1.35.0@sha256:18bc02c1e0df04451f4f9194eb7b7341c1165da5495459b52f85f72fb9545032
+        repository: docker.io/rancher/kubectl
+  zitadel:
+    masterkeySecretName: identity-masterkey
+    configmapConfig:
+      ExternalDomain: identity.example.com
+      ExternalPort: 443
+      ExternalSecure: true
+      TLS:
+        Enabled: false
+      Database:
+        Postgres:
+          Host: identity-db-rw
+          Port: 5432
+          Database: zitadel
+          MaxOpenConns: 10
+          MaxIdleConns: 5
+          User:
+            Username: zitadel
+            SSL:
+              Mode: require
+          Admin:
+            Username: zitadel
+            SSL:
+              Mode: require
+      SystemDefaults:
+        Multifactors:
+          OTP:
+            Issuer: AlphaBravo
+        PasswordHasher:
+          Hasher:
+            Algorithm: argon2id
+            Time: 2
+            Memory: 19456
+            Threads: 1
+          Verifiers:
+          - bcrypt
+      HTTPClient:
+        DenyList:
+        - localhost
+        - 0.0.0.0/8
+        - 10.0.0.0/11
+        - 10.32.0.0/13
+        - 10.40.0.0/15
+        - 10.42.0.0/16
+        - 10.44.0.0/14
+        - 10.48.0.0/12
+        - 10.64.0.0/10
+        - 10.128.0.0/9
+        - 100.64.0.0/10
+        - 127.0.0.0/8
+        - 169.254.0.0/16
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 198.18.0.0/15
+        - ::/128
+        - ::1/128
+        - fc00::/7
+        - fe80::/10
+      ServicePing:
+        Enabled: false
+      Telemetry:
+        Enabled: false
+      UserAgentCookie:
+        Name: ab.ua
+      Login:
+        LanguageCookieName: ab.lang
+        CSRFCookieName: ab.csrf
+      FirstInstance:
+        InstanceName: AlphaBravo
+        Org:
+          Name: AlphaBravo
+        OIDCSettings:
+          AccessTokenLifetime: 10m
+          IdTokenLifetime: 10m
+          RefreshTokenIdleExpiration: 24h
+          RefreshTokenExpiration: 168h
+      DefaultInstance:
+        OIDCSettings:
+          AccessTokenLifetime: 10m
+          IdTokenLifetime: 10m
+          RefreshTokenIdleExpiration: 24h
+          RefreshTokenExpiration: 168h
+  env:
+  - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: identity-db-app
+        key: password
+  - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: identity-db-app
+        key: password
+  - name: GOMEMLIMIT
+    value: 150MiB
+  - name: GOGC
+    value: '75'
+  resources:
+    requests:
+      cpu: 100m
+      memory: 160Mi
+    limits:
+      memory: 320Mi
+  lifecycle:
+    preStop:
+      sleep:
+        seconds: 5
+  pdb:
+    enabled: true
+    minAvailable: 1
+  initJob:
+    command: zitadel
+  ingress:
+    enabled: false
+    className: traefik
+    hosts:
+    - host: idp.spike.local
+      paths:
+      - path: /.well-known/openid-configuration
+        pathType: Exact
+      - path: /oauth/v2
+        pathType: Prefix
+      - path: /oidc/v1
+        pathType: Prefix
+      - path: /idps
+        pathType: Prefix
+    tls:
+    - hosts:
+      - idp.spike.local
+      secretName: idp-tls
+  login:
+    enabled: false
+  fullnameOverride: identity-engine
