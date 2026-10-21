@@ -160,3 +160,110 @@ func BenchmarkVerify(b *testing.B) {
 		b.Fatal("network in benchmark")
 	}
 }
+
+// Products using opaque server-side sessions still need verified profile and nonce
+// claims, bounded claim lifetime and the OIDC multi-audience ID-token check.
+func TestServerSideSessionClaims(t *testing.T) {
+	f := setup(t, "")
+	f.v.config.MaxTokenLifetime = 10 * time.Minute
+	f.v.config.AuthorizedParty = "wolf"
+	raw := f.token(t, func(c jwt.MapClaims) {
+		c["iat"] = time.Now().Unix()
+		c["email"] = "alice@example.com"
+		c["name"] = "Alice"
+		c["nonce"] = "browser-bound"
+		c["aud"] = []string{"wolf", "other"}
+		c["azp"] = "wolf"
+	})
+	i, err := f.v.Verify(raw)
+	if err != nil || i.Email() != "alice@example.com" || i.Name() != "Alice" || i.Nonce() != "browser-bound" || i.Expires().IsZero() {
+		t.Fatalf("verified claims: %v %v", i, err)
+	}
+	for _, field := range []string{"missing-iat", "long-lifetime", "invalid-azp", "reversed-lifetime"} {
+		t.Run(field, func(t *testing.T) {
+			bad := f.token(t, func(c jwt.MapClaims) {
+				c["iat"] = time.Now().Unix()
+				c["aud"] = []string{"wolf", "other"}
+				c["azp"] = "wolf"
+				switch field {
+				case "missing-iat":
+					delete(c, "iat")
+				case "long-lifetime":
+					c["exp"] = time.Now().Add(11 * time.Minute).Unix()
+				case "invalid-azp":
+					c["azp"] = "other"
+				case "reversed-lifetime":
+					c["iat"] = time.Now().Add(2 * time.Minute).Unix()
+				}
+			})
+			if _, err := f.v.Verify(bad); err == nil {
+				t.Fatal("accepted invalid ID-token claims")
+			}
+		})
+	}
+}
+
+func TestRefreshFailureKeepsUnseenTokensValid(t *testing.T) {
+	f := setup(t, "")
+	f.v.keys.MinGap = 0
+	f.fail.Store(true)
+	before := f.requests.Load()
+	if err := f.v.Refresh(t.Context()); err == nil {
+		t.Fatal("expected failed HTTP refresh")
+	}
+	if f.requests.Load() != before+1 {
+		t.Fatal("refresh did not perform HTTP")
+	}
+	if _, err := f.v.Verify(f.token(t, func(c jwt.MapClaims) { c["jti"] = "unseen-during-outage" })); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUnknownKeyDoesNotBlock(t *testing.T) {
+	f := setup(t, "")
+	f.v.keys.MinGap = 0
+	entered, release := make(chan struct{}), make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { close(entered); <-release; w.WriteHeader(503) }))
+	defer server.Close()
+	defer close(release)
+	f.v.keys.URL = server.URL
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{"iss": "https://customer.example", "aud": "wolf", "sub": "alice", "exp": time.Now().Add(time.Minute).Unix()})
+	token.Header["kid"] = "unknown"
+	raw, err := token.SignedString(f.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := f.v.Verify(raw); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("unknown key accepted")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("request blocked on JWKS network")
+	}
+	<-entered
+}
+
+func TestAsymmetricAlgorithmConfiguration(t *testing.T) {
+	for _, algorithm := range []string{"HS256", "none", "RS-not-real"} {
+		if _, err := New(t.Context(), Config{Issuer: "issuer", Audience: "app", JWKSURL: "unused", Algorithms: []string{algorithm}}); err == nil {
+			t.Fatalf("accepted %s", algorithm)
+		}
+	}
+	f := setup(t, "")
+	v, err := New(t.Context(), Config{Issuer: "https://customer.example", Audience: "wolf", JWKSURL: f.server.URL, Algorithms: []string{"PS256"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodPS256, jwt.MapClaims{"iss": "https://customer.example", "aud": "wolf", "sub": "alice", "exp": time.Now().Add(time.Minute).Unix()})
+	token.Header["kid"] = "one"
+	raw, err := token.SignedString(f.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Verify(raw); err != nil {
+		t.Fatal(err)
+	}
+}

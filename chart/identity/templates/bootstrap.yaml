@@ -30,8 +30,11 @@ spec:
   activeDeadlineSeconds: 600
   template:
     metadata:
-      labels: {app.kubernetes.io/component: identity-bootstrap}
+      labels: {app.kubernetes.io/component: identity-bootstrap, app.kubernetes.io/name: identity, app.kubernetes.io/instance: {{ .Release.Name }}}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "identity.name" . }}-bootstrap
       restartPolicy: OnFailure
       securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532}

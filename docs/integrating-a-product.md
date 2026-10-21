@@ -113,3 +113,43 @@ account and sends the product-branded invitation through the configured SMTP rel
 Keep that capability in backend administration only; it permits organization-wide
 user invitations and is deliberately absent from product OIDC credentials. The
 public invitation form verifies the single-use invite code before password setup.
+
+
+## Server-side product sessions (v0.1.2)
+
+Products that already own opaque sessions can use the shared verifier without the
+Web cookie handlers. Identity exposes immutable `Email()`, `Name()`, `Nonce()` and
+`Expires()` alongside subject and roles. Set `MaxTokenLifetime` to enforce the
+product's issued-at requirement and lifetime limit. For an ID-token verifier set
+`AuthorizedParty` to the client ID; multi-audience tokens then require matching azp.
+Keep PKCE, nonce and one-use state in the product's existing server-side code flow.
+Call `Refresh(ctx)` every 15 minutes, including when all requests hit the memo.
+Failed refreshes preserve signing keys. Unknown keys fail closed immediately and
+refresh asynchronously, so network latency never blocks token verification.
+
+## Installing as an optional dependency
+
+Registry URLs support trusted Helm templates, evaluated against the identity
+subchart values, for example
+`https://{{ .Values.zitadel.zitadel.configmapConfig.ExternalDomain }}/callback`.
+Use `secretPrefix` to give each product's durable credentials a unique namespace
+name. Wire the product to Secret keys `issuer`, `client-id`, `client-secret`; never
+copy create-only secrets into Helm values. If a new dependency is enabled during
+an upgrade, the retained master key and optional database are created before
+engine init hooks. Bootstrap remains an ordinary Job and creates credentials
+before the dependent product Pod can start.
+
+The network policy selects identity Pods only; it never grants egress to every
+Pod in the parent namespace. Override `networkPolicy.ingressPeers` and
+`ingressPorts` for your ingress controller. `ingress.annotations` supports the
+installation's TLS issuer. The private sign-in capability port is available only
+to namespace Pods. Database policies permit the configured CNPG operator and API.
+Use `imagePullSecrets` for owned images and `zitadel.imagePullSecrets` for vendor
+images in a private mirror. Keep secrets and database snapshots together.
+
+`third_party/engine` and `third_party/kubectl` rebuild the pinned vendor dependencies
+with Go 1.27.3. They are vendor mirrors, not additional owned identity services.
+The engine source is v4.19.5 at a618740b578627b7b9acbbb111a6948882d6f5dc,
+with security-only x/net and x/crypto updates. The private management-console SPA
+is omitted; public UI remains the signin service. All published images are
+scanned and signed, including these vendor mirrors.

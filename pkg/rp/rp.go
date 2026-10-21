@@ -21,17 +21,26 @@ type Config struct {
 	Algorithms                                     []string
 	HTTPClient                                     *http.Client
 	MaxTokens                                      int
+	// MaxTokenLifetime requires issued-at and bounds expiry minus issued-at when set.
+	MaxTokenLifetime time.Duration
+	// AuthorizedParty validates azp on multi-audience ID tokens when set.
+	AuthorizedParty string
 }
 
 // Identity is immutable to callers; Roles returns a copy.
 type Identity struct {
-	subject string
-	roles   []string
-	expires time.Time
+	subject            string
+	roles              []string
+	expires            time.Time
+	email, name, nonce string
 }
 
-func (i Identity) Subject() string { return i.subject }
-func (i Identity) Roles() []string { return append([]string(nil), i.roles...) }
+func (i Identity) Subject() string    { return i.subject }
+func (i Identity) Expires() time.Time { return i.expires }
+func (i Identity) Email() string      { return i.email }
+func (i Identity) Name() string       { return i.name }
+func (i Identity) Nonce() string      { return i.nonce }
+func (i Identity) Roles() []string    { return append([]string(nil), i.roles...) }
 func (i Identity) HasRole(role string) bool {
 	for _, r := range i.roles {
 		if r == role {
@@ -66,7 +75,9 @@ func New(ctx context.Context, c Config) (*Verifier, error) {
 		c.Algorithms = []string{"RS256"}
 	}
 	for _, a := range c.Algorithms {
-		if !strings.HasPrefix(a, "RS") && !strings.HasPrefix(a, "ES") && a != "EdDSA" {
+		switch jwt.GetSigningMethod(a).(type) {
+		case *jwt.SigningMethodRSA, *jwt.SigningMethodRSAPSS, *jwt.SigningMethodECDSA, *jwt.SigningMethodEd25519:
+		default:
 			return nil, errors.New("only asymmetric signing algorithms are supported")
 		}
 	}
@@ -114,6 +125,21 @@ func (v *Verifier) Verify(raw string) (Identity, error) {
 		return Identity{}, errors.New("missing expiry")
 	}
 	i := Identity{subject: subject, expires: expiry.Time}
+	if v.config.MaxTokenLifetime > 0 {
+		issued, err := claims.GetIssuedAt()
+		if err != nil || issued == nil || !expiry.After(issued.Time) || expiry.Sub(issued.Time) > v.config.MaxTokenLifetime {
+			return Identity{}, errors.New("invalid token lifetime")
+		}
+	}
+	if v.config.AuthorizedParty != "" {
+		audiences, _ := claims.GetAudience()
+		if len(audiences) > 1 && claims["azp"] != v.config.AuthorizedParty {
+			return Identity{}, errors.New("invalid authorized party")
+		}
+	}
+	i.email, _ = claims["email"].(string)
+	i.name, _ = claims["name"].(string)
+	i.nonce, _ = claims["nonce"].(string)
 	roles := claims[v.config.RolesClaim]
 	if m, ok := roles.(map[string]any); ok {
 		roles = m[v.config.Product]
@@ -124,6 +150,9 @@ func (v *Verifier) Verify(raw string) (Identity, error) {
 				i.roles = append(i.roles, s)
 			}
 		}
+	}
+	if role, ok := roles.(string); ok {
+		i.roles = []string{role}
 	}
 	v.mu.Lock()
 	if old := v.memo[key]; old != nil {
@@ -138,6 +167,10 @@ func (v *Verifier) Verify(raw string) (Identity, error) {
 	v.mu.Unlock()
 	return i, nil
 }
+
+// Refresh preloads rotated signing keys; a failed fetch retains last-good keys.
+// Call periodically even when every request hits the verification memo.
+func (v *Verifier) Refresh(ctx context.Context) error { return v.keys.Refresh(ctx) }
 
 type contextKey struct{}
 

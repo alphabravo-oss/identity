@@ -67,14 +67,28 @@
             "minItems": 1,
             "items": {
               "type": "string",
-              "format": "uri"
+              "anyOf": [
+                {
+                  "format": "uri"
+                },
+                {
+                  "pattern": "\\{\\{.+\\}\\}"
+                }
+              ]
             }
           },
           "postLogoutRedirects": {
             "type": "array",
             "items": {
               "type": "string",
-              "format": "uri"
+              "anyOf": [
+                {
+                  "format": "uri"
+                },
+                {
+                  "pattern": "\\{\\{.+\\}\\}"
+                }
+              ]
             }
           },
           "groupRoles": {

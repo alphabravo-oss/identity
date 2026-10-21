@@ -2,9 +2,16 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
   name: {{ include "identity.name" . }}-egress
 spec:
-  podSelector: {}
+  podSelector:
+    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}}
+    matchExpressions:
+      - {key: app.kubernetes.io/name, operator: In, values: [identity, zitadel]}
   policyTypes: [Egress]
   egress:
     - to: [{podSelector: {}}]
@@ -12,10 +19,10 @@ spec:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
           podSelector: {matchLabels: {k8s-app: kube-dns}}
       ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
-    - to:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
-          podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
-      ports: [{port: 8443}, {port: 8000}]
+    {{- with .Values.networkPolicy.ingressPeers }}
+    - to: {{- toYaml . | nindent 8 }}
+      ports: {{- toYaml $.Values.networkPolicy.ingressPorts | nindent 8 }}
+    {{- end }}
     {{- with .Values.networkPolicy.upstreams }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -23,6 +30,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
   name: {{ include "identity.name" . }}-setup-api
 spec:
   podSelector:
@@ -41,6 +52,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
   name: {{ include "identity.name" . }}-private
 spec:
   podSelector:
@@ -52,16 +67,20 @@ spec:
   ingress:
     - from: [{podSelector: {}}]
       ports: [{port: 8080}]
-    - from:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
-          podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
+    {{- with .Values.networkPolicy.ingressPeers }}
+    - from: {{- toYaml . | nindent 8 }}
       ports: [{port: 8080}]
+    {{- end }}
 {{- end }}
 {{- if and .Values.networkPolicy.enabled .Values.database.create }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
   name: {{ include "identity.name" . }}-database-api
 spec:
   podSelector: {matchLabels: {cnpg.io/cluster: {{ .Values.database.name }}}}
@@ -72,4 +91,52 @@ spec:
         - ipBlock: {cidr: {{ . | quote }}}
         {{- end }}
       ports: [{port: 443}, {port: 6443}]
+{{- end }}
+
+{{- if .Values.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "identity.name" . }}-signin
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  podSelector: {matchLabels: {app: "{{ include "identity.name" . }}-signin"}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {}}]
+      ports: [{port: 8080}, {port: 8090}]
+    {{- with .Values.networkPolicy.ingressPeers }}
+    - from: {{- toYaml . | nindent 8 }}
+      ports: [{port: 8080}]
+    {{- end }}
+{{- end }}
+{{- if and .Values.networkPolicy.enabled .Values.database.create }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "identity.name" . }}-database
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  podSelector: {matchLabels: {cnpg.io/cluster: {{ .Values.database.name }}}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {}}]
+      ports: [{port: 5432}]
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ .Values.networkPolicy.databaseOperatorNamespace }}}}
+      ports: [{port: 8000}, {port: 5432}]
+  egress:
+    - to: [{podSelector: {}}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
 {{- end }}

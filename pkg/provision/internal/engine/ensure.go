@@ -98,13 +98,13 @@ func ensureApp(ctx context.Context, c *client.Client, s Spec, r *Result) error {
 		}
 		r.AppID, r.ClientID = a.ApplicationId, oc.ClientId
 		if slices.Equal(oc.RedirectUris, s.RedirectURIs) && slices.Equal(oc.PostLogoutRedirectUris, s.PostLogoutRedirects) &&
-			oc.GetLoginVersion().GetLoginV2().GetBaseUri() == s.LoginBaseURI {
+			oc.GetLoginVersion().GetLoginV2().GetBaseUri() == s.LoginBaseURI && oc.GetIdTokenUserinfoAssertion() {
 			return nil
 		}
 		_, err := c.ApplicationServiceV2().UpdateApplication(ctx, &app.UpdateApplicationRequest{
 			ApplicationId: a.ApplicationId, ProjectId: r.ProjectID,
 			ApplicationType: &app.UpdateApplicationRequest_OidcConfiguration{OidcConfiguration: &app.UpdateOIDCApplicationConfigurationRequest{
-				RedirectUris: s.RedirectURIs, PostLogoutRedirectUris: s.PostLogoutRedirects, LoginVersion: loginVersion(s.LoginBaseURI),
+				RedirectUris: s.RedirectURIs, PostLogoutRedirectUris: s.PostLogoutRedirects, LoginVersion: loginVersion(s.LoginBaseURI), IdTokenUserinfoAssertion: ptr(true),
 			}},
 		})
 		r.Updated = err == nil
@@ -124,6 +124,7 @@ func ensureApp(ctx context.Context, c *client.Client, s Spec, r *Result) error {
 			// which is what feeds user_grants to the Action); this keeps urn:zitadel:* claims out of tokens.
 			AccessTokenRoleAssertion: false,
 			IdTokenRoleAssertion:     false,
+			IdTokenUserinfoAssertion: true,
 			LoginVersion:             loginVersion(s.LoginBaseURI),
 		}},
 	})
@@ -141,3 +142,5 @@ func loginVersion(baseURI string) *app.LoginVersion {
 	}
 	return &app.LoginVersion{Version: &app.LoginVersion_LoginV2{LoginV2: &app.LoginV2{BaseUri: &baseURI}}}
 }
+
+func ptr[T any](v T) *T { return &v }

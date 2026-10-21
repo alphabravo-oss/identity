@@ -47,11 +47,11 @@ func (c *Cache) Keyfunc(t *jwt.Token) (any, error) {
 		}
 		return k, nil
 	}
-	err := c.Refresh(context.Background()) // unknown kid: rotation, or first use
-	if k, ok := c.lookup(kid); ok {
-		return k, nil
+	// Fail closed immediately while rotation refreshes in the background.
+	if c.refreshing.CompareAndSwap(false, true) {
+		go func() { defer c.refreshing.Store(false); _ = c.Refresh(context.Background()) }()
 	}
-	return nil, errors.Join(fmt.Errorf("jwks: unknown kid %q", kid), err)
+	return nil, errors.New("jwks: unknown signing key")
 }
 
 func (c *Cache) lookup(kid string) (crypto.PublicKey, bool) {
@@ -90,7 +90,7 @@ func (c *Cache) Refresh(ctx context.Context) error {
 	}
 	m := make(map[string]crypto.PublicKey, len(set.Keys))
 	for _, k := range set.Keys {
-		if k.Use == "" || k.Use == "sig" {
+		if k.KeyID != "" && k.Valid() && k.IsPublic() && (k.Use == "" || k.Use == "sig") {
 			m[k.KeyID] = k.Key
 		}
 	}

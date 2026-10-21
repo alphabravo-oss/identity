@@ -46,7 +46,7 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           if [[ "$REUSE_IMAGES" != true ]]; then make images; fi
           mkdir -p dist
-          for service in signin bootstrap; do
+          for service in signin bootstrap vendor-engine vendor-kubectl; do
             image="ghcr.io/alphabravo-oss/identity/$service:$VERSION"
             if [[ "$REUSE_IMAGES" == true ]]; then docker pull "$image"; fi
             grype "docker:$image" --fail-on high -o json > "dist/$service-grype.json"
@@ -59,14 +59,21 @@ jobs:
           p='chart/identity/values.yaml'
           s=open(p).read()
           service=os.environ['SERVICE']
-          marker='    repository: ghcr.io/alphabravo-oss/identity/'+service
-          start=s.index(marker)
-          tag_start=s.index('    tag:',start)
-          tag_end=s.index('\n',tag_start)
-          s=s[:tag_start]+'    tag: '+os.environ['VERSION']+s[tag_end:]
-          digest_start=s.index('    digest:',start)
-          digest_end=s.index('\n',digest_start)
-          s=s[:digest_start]+'    digest: '+os.environ['DIGEST']+s[digest_end:]
+          if service in ('signin','bootstrap'):
+              marker='    repository: ghcr.io/alphabravo-oss/identity/'+service
+              start=s.index(marker)
+              tag_start=s.index('    tag:',start)
+              tag_end=s.index('\n',tag_start)
+              s=s[:tag_start]+'    tag: '+os.environ['VERSION']+s[tag_end:]
+              digest_start=s.index('    digest:',start)
+              digest_end=s.index('\n',digest_start)
+              s=s[:digest_start]+'    digest: '+os.environ['DIGEST']+s[digest_end:]
+          else:
+              marker='repository: ghcr.io/alphabravo-oss/identity/'+service
+              start=s.index(marker)
+              tag_start=s.index('tag:',start)
+              tag_end=s.index('\n',tag_start)
+              s=s[:tag_start]+'tag: '+os.environ['VERSION']+'@'+os.environ['DIGEST']+s[tag_end:]
           open(p,'w').write(s)
           PY
           done
