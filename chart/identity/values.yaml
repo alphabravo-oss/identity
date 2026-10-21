@@ -1,3 +1,5 @@
+providers:
+  existingSecret: ""
 global:
   identity:
     domain: identity.example.com

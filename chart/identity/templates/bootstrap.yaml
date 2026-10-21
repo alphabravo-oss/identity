@@ -50,11 +50,21 @@ spec:
             - {name: ADMIN_PAT_FILE, value: /admin/pat}
             - {name: RUNTIME_SECRET, value: "{{ include "identity.name" . }}-runtime"}
             - {name: ACTION_NAME, value: "{{ include "identity.name" . }}-roles"}
+            {{- if .Values.providers.existingSecret }}
+            - {name: PROVIDERS_FILE, value: /providers/providers.json}
+            {{- end }}
             - {name: CLAIMS_ENDPOINT, value: "http://{{ include "identity.name" . }}-signin:8090/claims"}
           volumeMounts:
+            {{- if .Values.providers.existingSecret }}
+            - {name: providers, mountPath: /providers, readOnly: true}
+            {{- end }}
             - {name: products, mountPath: /config, readOnly: true}
             - {name: admin, mountPath: /admin, readOnly: true}
       volumes:
+        {{- if .Values.providers.existingSecret }}
+        - name: providers
+          secret: {secretName: {{ .Values.providers.existingSecret }}}
+        {{- end }}
         - name: products
           configMap: {name: "{{ include "identity.name" . }}-products"}
         - name: admin

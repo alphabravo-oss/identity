@@ -65,3 +65,17 @@ func TestGroupExtraction(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestNullOriginStillRequiresCSRF(t *testing.T) {
+	testCipher(t)
+	h := protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	r := httptest.NewRequest("POST", "/signin/password", strings.NewReader("csrf=bound-token"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Origin", "null")
+	r.AddCookie(&http.Cookie{Name: "ab_csrf", Value: seal("ab_csrf", "bound-token")})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusNoContent {
+		t.Fatal(w.Code)
+	}
+}

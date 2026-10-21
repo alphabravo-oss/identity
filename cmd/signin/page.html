@@ -3,38 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in · {{.Brand.Product}}</title>
+<link rel="stylesheet" href="/signin/static/tokens.css"><title>Sign in · {{.Brand.Product}}</title>
 <style>
 @font-face { font-family: "Inter Variable"; src: url("/signin/static/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 :root {
-  --bg: #f7f7f8; --surface: #ffffff; --text: #18181b; --muted: #71717a; --border: #e4e4e7; --field: #ffffff;
+  --bg: hsl(var(--background)); --surface: hsl(var(--card)); --text: hsl(var(--foreground)); --muted-text: hsl(var(--muted-foreground)); --line: hsl(var(--border)); --field: hsl(var(--background));
   --accent: {{.Brand.Accent}}; --on-accent: #ffffff; --danger: #b91c1c; --danger-bg: #fef2f2;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #09090b; --surface: #18181b; --text: #fafafa; --muted: #a1a1aa; --border: #27272a; --field: #09090b;
+  --bg: hsl(var(--background)); --surface: hsl(var(--card)); --text: hsl(var(--foreground)); --muted-text: hsl(var(--muted-foreground)); --line: hsl(var(--border)); --field: hsl(var(--background));
   --accent: {{.Brand.AccentDark}}; --on-accent: #09090b; --danger: #fca5a5; --danger-bg: #450a0a; } }
 :root[data-theme="dark"] {
-  --bg: #09090b; --surface: #18181b; --text: #fafafa; --muted: #a1a1aa; --border: #27272a; --field: #09090b;
+  --bg: hsl(var(--background)); --surface: hsl(var(--card)); --text: hsl(var(--foreground)); --muted-text: hsl(var(--muted-foreground)); --line: hsl(var(--border)); --field: hsl(var(--background));
   --accent: {{.Brand.AccentDark}}; --on-accent: #09090b; --danger: #fca5a5; --danger-bg: #450a0a; }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg); color: var(--text);
   font: 15px/1.5 "Inter Variable", system-ui, sans-serif; font-feature-settings: "cv11", "ss01"; }
-.card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 32px; }
+.card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 32px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; letter-spacing: -0.01em; margin-bottom: 28px; }
 .brand svg { color: var(--accent); }
 h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 4px; }
-p.sub { color: var(--muted); margin: 0 0 24px; }
+p.sub { color: var(--muted-text); margin: 0 0 24px; }
 label { display: block; font-size: 13px; font-weight: 550; margin: 14px 0 6px; }
-input { width: 100%; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--field); color: var(--text); font: inherit; }
+input { width: 100%; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--text); font: inherit; }
 input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 button, .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin-top: 20px; border: 0; border-radius: 8px;
   background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
-.btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 10px; font-weight: 550; }
-.sep { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: 24px 0 4px; }
-.sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); margin-top: 10px; font-weight: 550; }
+.sep { display: flex; align-items: center; gap: 12px; color: var(--muted-text); font-size: 12px; margin: 24px 0 4px; }
+.sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .err { background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-bottom: 8px; }
 details summary { list-style: none; } details summary::-webkit-details-marker { display: none; }
-.foot { color: var(--muted); font-size: 12px; text-align: center; margin-top: 24px; }
+.foot { color: var(--muted-text); font-size: 12px; text-align: center; margin-top: 24px; }
 </style>
 </head>
 <body>
@@ -80,6 +80,12 @@ details summary { list-style: none; } details summary::-webkit-details-marker { 
   {{else if eq .Step "enroll"}}
   <h1>Protect your account</h1><p class="sub">Add this key to your authenticator app, then enter its code.</p><p><code>{{.Secret}}</code></p>
   <form method="post" action="/signin/enroll"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><label for="code">Verification code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" required><button>Verify</button></form>
+  {{else if eq .Step "security"}}
+  <h1>Account security</h1><form method="post" action="/signin/passkey/register"><input type="hidden" name="csrf" value="{{.CSRF}}"><button>Add a passkey</button></form>
+  {{else if eq .Step "passkey-created"}}
+  <h1>Your passkey is ready</h1><p class="sub">Use it next time you sign in.</p>
+  {{else if eq .Step "passkey-register"}}
+  <h1>Add a passkey</h1><form id="passkey" method="post" action="/signin/passkey/register/finish" data-register="true"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="assertion"><input type="hidden" id="options" value="{{.Options}}"><button type="button" id="passkey-button">Create passkey</button><p id="passkey-error" role="alert"></p></form><script src="/signin/static/passkey.js"></script>
   {{else if eq .Step "passkey"}}
   <h1>Use your passkey</h1><p class="sub">Follow your device's instructions.</p><form id="passkey" method="post" action="/signin/passkey/finish"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><input type="hidden" name="assertion"><input type="hidden" id="options" value="{{.Options}}"><button type="button" id="passkey-button">Continue with passkey</button><p id="passkey-error" role="alert"></p></form><script src="/signin/static/passkey.js"></script>
   {{else if eq .Step "invite"}}

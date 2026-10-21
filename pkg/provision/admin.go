@@ -6,7 +6,6 @@ import (
 	"net/url"
 
 	auth "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/authorization/v2"
-	object "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/object/v2"
 	user "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/user/v2"
 )
 
@@ -18,16 +17,16 @@ type Invitation struct{ UserID, EmailVerificationCode, URL string }
 // Never log the returned codes or URL. The sign-in service consumes the invite and
 // asks the recipient to choose a password, then enroll required MFA.
 func (c *Client) InviteUser(ctx context.Context, s UserSpec, signinBase string) (Invitation, error) {
-	u, err := c.engine.UserServiceV2().AddHumanUser(ctx, &user.AddHumanUserRequest{Username: &s.Username, Organization: &object.Organization{Org: &object.Organization_OrgId{OrgId: s.OrganizationID}}, Profile: &user.SetHumanProfile{GivenName: s.GivenName, FamilyName: s.FamilyName}, Email: &user.SetHumanEmail{Email: s.Email, Verification: &user.SetHumanEmail_ReturnCode{ReturnCode: &user.ReturnEmailVerificationCode{}}}})
+	u, err := c.engine.UserServiceV2().CreateUser(ctx, &user.CreateUserRequest{Username: &s.Username, OrganizationId: s.OrganizationID, UserType: &user.CreateUserRequest_Human_{Human: &user.CreateUserRequest_Human{Profile: &user.SetHumanProfile{GivenName: s.GivenName, FamilyName: s.FamilyName}, Email: &user.SetHumanEmail{Email: s.Email, Verification: &user.SetHumanEmail_ReturnCode{ReturnCode: &user.ReturnEmailVerificationCode{}}}}}})
 	if err != nil {
 		return Invitation{}, err
 	}
-	code, err := c.engine.UserServiceV2().CreateInviteCode(ctx, &user.CreateInviteCodeRequest{UserId: u.UserId, Verification: &user.CreateInviteCodeRequest_ReturnCode{ReturnCode: &user.ReturnInviteCode{}}})
+	code, err := c.engine.UserServiceV2().CreateInviteCode(ctx, &user.CreateInviteCodeRequest{UserId: u.Id, Verification: &user.CreateInviteCodeRequest_ReturnCode{ReturnCode: &user.ReturnInviteCode{}}})
 	if err != nil {
-		return Invitation{UserID: u.UserId}, err
+		return Invitation{UserID: u.Id}, err
 	}
-	link := signinBase + "/invite?" + url.Values{"userId": {u.UserId}, "code": {code.GetInviteCode()}}.Encode()
-	return Invitation{UserID: u.UserId, EmailVerificationCode: u.GetEmailCode(), URL: link}, nil
+	link := signinBase + "/invite?" + url.Values{"userId": {u.Id}, "code": {code.GetInviteCode()}}.Encode()
+	return Invitation{UserID: u.Id, EmailVerificationCode: u.GetEmailCode(), URL: link}, nil
 }
 func (c *Client) DeactivateUser(ctx context.Context, id string) error {
 	_, err := c.engine.UserServiceV2().DeactivateUser(ctx, &user.DeactivateUserRequest{UserId: id})

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
@@ -78,20 +80,60 @@ func getCookie(r *http.Request, name string) (*http.Cookie, error) {
 	c.Value = v.Value
 	return c, nil
 }
+
+var configMu sync.RWMutex
+var registryHash [32]byte
+
 func loadConfig() {
 	path := os.Getenv("REGISTRY_FILE")
 	if path == "" {
 		return
 	}
-	var c registry.Runtime
-	if err := json.Unmarshal([]byte(readFile(path)), &c); err != nil {
-		log.Fatal(err)
+	raw, err := os.ReadFile(path) // #nosec G304 G703 -- Operator-owned mounted registry path.
+	if err != nil {
+		log.Fatal("product registry unavailable")
 	}
-	brands = c.Brands
-	groupMap = c.GroupMap
-	idps = c.IDPs
+	if err = applyConfig(raw); err != nil {
+		log.Fatal("invalid product registry")
+	}
+
+}
+
+func applyConfig(raw []byte) error {
+	hash := sha256.Sum256(raw)
+	if hash == registryHash {
+		return nil
+	}
+	var c registry.Runtime
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return err
+	}
+	configMu.Lock()
+	defer configMu.Unlock()
+	brands, groupMap, idps = c.Brands, c.GroupMap, c.IDPs
 	if err := os.Setenv("ORG_ID", c.OrgID); err != nil {
-		log.Fatal(err)
+		return err
+	}
+	registryHash = hash
+	return nil
+}
+func watchConfig(ctx context.Context) {
+	path := os.Getenv("REGISTRY_FILE")
+	if path == "" {
+		return
+	}
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			b, err := os.ReadFile(path) // #nosec G304 G703 -- Operator-owned mounted registry; retain last good config on read/parse failure.
+			if err == nil {
+				_ = applyConfig(b)
+			}
+		}
 	}
 }
 
@@ -107,6 +149,8 @@ var limits = struct {
 
 func protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		configMu.RLock()
+		defer configMu.RUnlock()
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
@@ -114,7 +158,7 @@ func protect(next http.Handler) http.Handler {
 			r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 			origin := r.Header.Get("Origin")
 			public, _ := url.Parse(base)
-			if origin != "" && origin != public.Scheme+"://"+public.Host {
+			if origin != "" && origin != "null" && origin != public.Scheme+"://"+public.Host {
 				http.Error(w, "Invalid request origin", http.StatusForbidden)
 				return
 			}
@@ -157,7 +201,7 @@ func protect(next http.Handler) http.Handler {
 		// Hide file-server listings and source files; static resources are an explicit allowlist.
 		if strings.HasPrefix(r.URL.Path, "/signin/static/") {
 			switch r.URL.Path {
-			case "/signin/static/inter.woff2", "/signin/static/autopost.js", "/signin/static/passkey.js":
+			case "/signin/static/inter.woff2", "/signin/static/tokens.css", "/signin/static/autopost.js", "/signin/static/passkey.js":
 			default:
 				http.NotFound(w, r)
 				return

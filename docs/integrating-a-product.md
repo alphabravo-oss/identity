@@ -69,3 +69,18 @@ library. Sign-in re-reads upstream groups and replaces mapped project grants on 
 fresh upstream login. Existing tokens retain claims for at most ten minutes; silent
 SSO reuses its session and does not authenticate upstream again. Logout ends the
 shared session; an upstream provider may retain its own session.
+
+To configure upstream sign-in at installation, create a Secret with `providers.json`
+and set `providers.existingSecret` to its name. The JSON accepts `oidc`, `saml` and
+`ldap` objects matching the library's Settings types. For example:
+
+```json
+{"oidc":{"Name":"Company SSO","Issuer":"https://sso.internal/realms/company","ClientID":"identity-client","ClientSecret":"REPLACE","Scopes":["openid","profile","email"]}}
+```
+
+The bootstrap Job configures these providers and stores their IDs in the shared
+runtime configuration. After changing product/provider registration, wait for bootstrap
+completion and the Secret volume update. Sign-in reloads the registry once per second
+and retains the last good configuration on read/parse failure. Active
+sessions survive because cookie keys and engine sessions remain stable. Place trusted
+private upstream CAs in the engine's mounted CA bundle. Provider logout remains separate.

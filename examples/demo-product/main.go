@@ -5,7 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -99,9 +99,10 @@ func main() {
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
-		_, _ = fmt.Fprintf(w, "%s\nSigned in as %s\nRoles: %s\n", slug, i.Subject(), strings.Join(i.Roles(), ", "))
+		_ = json.NewEncoder(w).Encode(map[string]any{"product": slug, "subject": i.Subject(), "roles": i.Roles()})
 	})
 	srv := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(srv.ListenAndServe())

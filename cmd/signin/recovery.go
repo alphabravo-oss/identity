@@ -147,3 +147,86 @@ func inviteAccept(w http.ResponseWriter, r *http.Request) {
 	}
 	render(w, r, view{Step: "reset-finish", UserID: uid, Code: out.VerificationCode})
 }
+
+// currentUser requires a completed shared login; a pending password-only session is insufficient.
+func currentUser(r *http.Request) (string, error) {
+	c, err := getCookie(r, "ab_session")
+	id, tok, ok := strings.Cut(cookieValue(c, err), ".")
+	if !ok {
+		return "", fmt.Errorf("sign in before managing credentials")
+	}
+	var out struct {
+		Session struct {
+			Factors struct {
+				User                     struct{ ID string }
+				Password, WebAuthN, TOTP json.RawMessage
+			}
+		}
+	}
+	if err := rpc("zitadel.session.v2.SessionService/GetSession", map[string]string{"sessionId": id, "sessionToken": tok}, &out); err != nil {
+		return "", err
+	}
+	f := out.Session.Factors
+	if f.User.ID == "" || (len(f.Password) == 0 && len(f.WebAuthN) == 0) {
+		return "", fmt.Errorf("local authentication required")
+	}
+	return f.User.ID, nil
+}
+func securityPage(w http.ResponseWriter, r *http.Request) {
+	if _, err := currentUser(r); err != nil {
+		fail(w, r, err)
+		return
+	}
+	render(w, r, view{Step: "security"})
+}
+func passkeyRegister(w http.ResponseWriter, r *http.Request) {
+	uid, err := currentUser(r)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	u, _ := url.Parse(base)
+	var out struct {
+		PasskeyID                          string
+		PublicKeyCredentialCreationOptions map[string]any
+	}
+	if err := rpc("zitadel.user.v2.UserService/RegisterPasskey", map[string]string{"userId": uid, "domain": u.Hostname()}, &out); err != nil {
+		fail(w, r, err)
+		return
+	}
+	options := out.PublicKeyCredentialCreationOptions
+	pub, _ := options["publicKey"].(map[string]any)
+	if pub == nil {
+		pub = options
+	}
+	if rp, ok := pub["rp"].(map[string]any); ok {
+		rp["name"] = "AlphaBravo"
+	}
+	b, _ := json.Marshal(options)
+	setCookie(w, "ab_registration", uid+"."+out.PasskeyID, 300)
+	render(w, r, view{Step: "passkey-register", Options: string(b)})
+}
+func passkeyRegisterFinish(w http.ResponseWriter, r *http.Request) {
+	uid, err := currentUser(r)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	c, err := getCookie(r, "ab_registration")
+	user, id, ok := strings.Cut(cookieValue(c, err), ".")
+	if !ok || user != uid {
+		fail(w, r, fmt.Errorf("expired passkey registration"))
+		return
+	}
+	var credential map[string]any
+	if json.Unmarshal([]byte(r.FormValue("assertion")), &credential) != nil {
+		fail(w, r, fmt.Errorf("invalid credential"))
+		return
+	}
+	if err := rpc("zitadel.user.v2.UserService/VerifyPasskeyRegistration", map[string]any{"userId": uid, "passkeyId": id, "publicKeyCredential": credential, "passkeyName": "Passkey"}, &struct{}{}); err != nil {
+		fail(w, r, err)
+		return
+	}
+	setCookie(w, "ab_registration", "", -1)
+	render(w, r, view{Step: "passkey-created"})
+}

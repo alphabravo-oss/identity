@@ -41,7 +41,6 @@ var (
 	idps     = mustJSON[map[string]string](env("IDPS", "{}"))        // kind -> idp id ("ldap", "oidc", "saml")
 	brands   = mustJSON[map[string]Brand](env("BRANDS", "{}"))       // OIDC client id -> brand
 	groupMap = mustJSON[map[string][]string](env("GROUP_MAP", "{}")) // external group -> ["<projectId>:<role>"]
-	debug    = os.Getenv("DEBUG") != ""
 	page     = template.Must(template.ParseFS(assets, "page.html"))
 	hc       = &http.Client{Timeout: 10 * time.Second}
 )
@@ -66,6 +65,9 @@ func main() {
 	mux.HandleFunc("GET /signin/login", loginPage)
 	mux.HandleFunc("POST /signin/password", password)
 	mux.HandleFunc("POST /signin/passkey/start", passkeyStart)
+	mux.HandleFunc("GET /signin/security", securityPage)
+	mux.HandleFunc("POST /signin/passkey/register", passkeyRegister)
+	mux.HandleFunc("POST /signin/passkey/register/finish", passkeyRegisterFinish)
 	mux.HandleFunc("POST /signin/passkey/finish", passkeyFinish)
 	mux.HandleFunc("GET /signin/reset", resetPage)
 	mux.HandleFunc("GET /signin/invite", invitePage)
@@ -89,6 +91,7 @@ func main() {
 	}()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+	go watchConfig(ctx)
 	go func() {
 		<-ctx.Done()
 		deadline, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -237,9 +240,6 @@ func federated(w http.ResponseWriter, r *http.Request, ar string, in intent) {
 		fail(w, r, err)
 		return
 	}
-	if debug {
-		log.Printf("idp information: %s", res.IdpInformation)
-	}
 	userID := res.UserID
 	if userID == "" { // JIT provisioning from the IdP's suggested profile, linked to the external identity
 		u := res.AddHumanUser
@@ -310,9 +310,6 @@ func fillFromSAML(u map[string]any, info json.RawMessage) {
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
-	if debug {
-		log.Printf("logout query: %s", r.URL.RawQuery)
-	}
 	if c, err := getCookie(r, "ab_session"); err == nil {
 		if id, tok, ok := strings.Cut(c.Value, "."); ok {
 			_ = rpc("zitadel.session.v2.SessionService/DeleteSession", map[string]string{"sessionId": id, "sessionToken": tok}, &struct{}{})
@@ -463,9 +460,6 @@ func syncRoles(userID string, gs []string) error {
 			}
 		}
 	}
-	if debug {
-		log.Printf("user %s groups=%v roles=%v", userID, gs, want)
-	}
 	return nil
 }
 
@@ -523,7 +517,7 @@ func render(w http.ResponseWriter, r *http.Request, v view) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self' https:")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self' https:; img-src 'self' https:")
 	if err := page.Execute(w, v); err != nil {
 		log.Print(err)
 	}
@@ -557,7 +551,7 @@ func env(k, def string) string {
 }
 
 func readFile(p string) string {
-	b, err := os.ReadFile(p)
+	b, err := os.ReadFile(p) // #nosec G304 G703 -- Deployment-controlled paths; no request data enters file paths.
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Fatal(err)
 	}

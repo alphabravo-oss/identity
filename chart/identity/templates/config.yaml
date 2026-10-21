@@ -10,7 +10,10 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ .Values.database.name }}
+  labels: {app.kubernetes.io/managed-by: Helm}
   annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
     helm.sh/resource-policy: keep
     {{- if .Release.IsInstall }}
     helm.sh/hook: pre-install
@@ -34,12 +37,16 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ .Values.zitadel.zitadel.masterkeySecretName }}
+  labels: {app.kubernetes.io/managed-by: Helm}
   annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
     helm.sh/resource-policy: keep
     {{- if .Release.IsInstall }}
     helm.sh/hook: pre-install
     helm.sh/hook-weight: "-5"
     {{- end }}
 type: Opaque
+immutable: true
 data:
   masterkey: {{ if $old }}{{ index $old.data "masterkey" }}{{ else }}{{ randAlphaNum 32 | b64enc }}{{ end }}

@@ -65,7 +65,7 @@ func main() {
 }
 func run(ctx context.Context) error {
 	api, host = os.Getenv("ENGINE_API"), os.Getenv("ENGINE_HOST")
-	b, err := os.ReadFile(os.Getenv("ADMIN_PAT_FILE"))
+	b, err := os.ReadFile(os.Getenv("ADMIN_PAT_FILE")) // #nosec G703 -- Operator-controlled credential mount path, never request input.
 	if err != nil {
 		return err
 	}
@@ -187,6 +187,38 @@ func run(ctx context.Context) error {
 			runtime.IDPs = old.IDPs
 		}
 	}
+	if path := os.Getenv("PROVIDERS_FILE"); path != "" {
+		b, err := os.ReadFile(path) // #nosec G304 G703 -- Operator-selected Secret mount, not request data.
+		if err != nil {
+			return err
+		}
+		var providers struct {
+			OIDC *provision.OIDCSettings `json:"oidc"`
+			SAML *provision.SAMLSettings `json:"saml"`
+			LDAP *provision.LDAPSettings `json:"ldap"`
+		}
+		if err = json.Unmarshal(b, &providers); err != nil {
+			return err
+		}
+		if providers.OIDC != nil {
+			runtime.IDPs["oidc"], err = c.ConfigureOIDCProvider(ctx, os.Getenv("ORGANIZATION"), *providers.OIDC)
+			if err != nil {
+				return err
+			}
+		}
+		if providers.SAML != nil {
+			runtime.IDPs["saml"], err = c.ConfigureSAMLProvider(ctx, os.Getenv("ORGANIZATION"), *providers.SAML)
+			if err != nil {
+				return err
+			}
+		}
+		if providers.LDAP != nil {
+			runtime.IDPs["ldap"], err = c.ConfigureLDAPProvider(ctx, os.Getenv("ORGANIZATION"), *providers.LDAP)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	b, err = json.Marshal(runtime)
 	if err != nil {
 		return err
@@ -196,22 +228,22 @@ func run(ctx context.Context) error {
 	if len(data["login-client.pat"]) == 0 {
 		uid := string(data["login-user-id"])
 		if uid == "" {
-			var u struct{ UserID string }
-			if err = rpc(ctx, "zitadel.management.v1.ManagementService/AddMachineUser", map[string]string{"userName": os.Getenv("ACTION_NAME") + "-login", "name": "AlphaBravo sign-in"}, &u); err != nil {
+			var u struct{ ID string }
+			if err = rpc(ctx, "zitadel.user.v2.UserService/CreateUser", map[string]any{"organizationId": runtime.OrgID, "username": os.Getenv("ACTION_NAME") + "-login", "machine": map[string]string{"name": "AlphaBravo sign-in"}}, &u); err != nil {
 				return err
 			}
-			uid = u.UserID
+			uid = u.ID
 			data["login-user-id"] = []byte(uid)
 			if err = kc.Put(ctx, name, data); err != nil {
 				return err
 			}
 		}
-		err = rpc(ctx, "zitadel.admin.v1.AdminService/AddIAMMember", map[string]any{"userId": uid, "roles": []string{"IAM_LOGIN_CLIENT"}}, &struct{}{})
+		err = rpc(ctx, "admin/v1/members", map[string]any{"userId": uid, "roles": []string{"IAM_LOGIN_CLIENT"}}, &struct{}{})
 		if err != nil && !strings.Contains(err.Error(), "already_exists") {
 			return err
 		}
 		var token struct{ Token string }
-		if err = rpc(ctx, "zitadel.management.v1.ManagementService/AddPersonalAccessToken", map[string]string{"userId": uid, "expirationDate": time.Now().AddDate(1, 0, 0).UTC().Format(time.RFC3339)}, &token); err != nil {
+		if err = rpc(ctx, "zitadel.user.v2.UserService/AddPersonalAccessToken", map[string]string{"userId": uid, "expirationDate": time.Now().AddDate(1, 0, 0).UTC().Format(time.RFC3339)}, &token); err != nil {
 			return err
 		}
 		data["login-client.pat"] = []byte(token.Token)
