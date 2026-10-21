@@ -6,6 +6,11 @@ on:
         description: Image and chart version without v
         required: true
         default: 0.1.0
+      reuse_images:
+        description: Reuse and rescan published images for a chart-only release
+        required: true
+        type: boolean
+        default: false
 permissions:
   contents: read
   packages: write
@@ -34,16 +39,18 @@ jobs:
       - name: Build, gate, push and sign
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          REUSE_IMAGES: ${{ inputs.reuse_images }}
         run: |
           set -euo pipefail
           export VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          make images
+          if [[ "$REUSE_IMAGES" != true ]]; then make images; fi
           mkdir -p dist
           for service in signin bootstrap; do
             image="ghcr.io/alphabravo-oss/identity/$service:$VERSION"
+            if [[ "$REUSE_IMAGES" == true ]]; then docker pull "$image"; fi
             grype "docker:$image" --fail-on high -o json > "dist/$service-grype.json"
-            docker push "$image"
+            if [[ "$REUSE_IMAGES" != true ]]; then docker push "$image"; fi
             digest=$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')
             cosign sign --yes "$image@$digest"
             echo "$service $digest" >> dist/digests.txt

@@ -6,7 +6,7 @@ metadata:
 spec:
   selector:
     matchLabels: {app.kubernetes.io/name: zitadel}
-  endpoints: [{port: http, path: /debug/metrics, interval: 30s}]
+  endpoints: [{port: http2-server, path: /debug/metrics, interval: 30s}]
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule

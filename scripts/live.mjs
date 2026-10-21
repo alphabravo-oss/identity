@@ -34,8 +34,8 @@ try {
  if(mode==='federated'){
   const kind=process.argv[3]||'oidc';const {ctx,page}=await context();await page.goto(apps['demo-product']+'/login');
   if(kind==='ldap'){await page.click('#ldap-toggle');await page.fill('#lu','dave');await page.fill('#lp','Ldap-Pass1!');await page.click('#ldap-submit');}
-  else {await page.click('#sso-'+kind);await page.waitForSelector('#username');await page.fill('#username',process.env.E2E_UPSTREAM_USER||'kim');await page.fill('#password','Kc-Pass1!');await page.click('#kc-login');}
-  await page.waitForURL(apps['demo-product']+'/',{timeout:20000});const body=await page.textContent('body');check(kind+' group mapping',process.env.E2E_NO_ROLE==='true'?!body.includes('admin'):body.includes('admin'),{body:body.trim()});await ctx.close();
+  else {await page.click('#sso-'+kind);try{await page.waitForSelector('#username',{timeout:10000});}catch(e){console.error('upstream error',page.url(),await page.textContent('body'));await page.screenshot({path:proof+'/shots/upstream-error.png'});throw e;}await page.fill('#username',process.env.E2E_UPSTREAM_USER||'kim');await page.fill('#password','Kc-Pass1!');await page.click('#kc-login');}
+  await page.waitForURL(apps['demo-product']+'/',{timeout:20000});const body=await page.textContent('body');check(kind+' group mapping',process.env.E2E_NO_ROLE==='true'?!body.includes('admin'):body.includes(process.env.E2E_ROLE||'admin'),{body:body.trim()});await ctx.close();
  }
  if(mode==='passkey'){
   const {ctx,page}=await context();await local(page);
