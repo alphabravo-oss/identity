@@ -7,15 +7,16 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/alphabravo-oss/identity/internal/kube"
-	"github.com/alphabravo-oss/identity/internal/registry"
-	"github.com/alphabravo-oss/identity/pkg/provision"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/alphabravo-oss/identity/internal/kube"
+	"github.com/alphabravo-oss/identity/internal/registry"
+	"github.com/alphabravo-oss/identity/pkg/provision"
 )
 
 type store struct {
@@ -45,7 +46,7 @@ func rpc(ctx context.Context, method string, in, out any) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	b, err = io.ReadAll(io.LimitReader(res.Body, 2<<20))
 	if err != nil {
 		return err
@@ -107,7 +108,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	runtime := registry.Runtime{Brands: map[string]registry.Branding{}, GroupMap: map[string][]string{}, IDPs: map[string]string{}}
 	for _, p := range products {
 		result, err := c.Ensure(ctx, provision.Spec{Org: os.Getenv("ORGANIZATION"), Project: p.Slug, App: p.Slug, Roles: p.Roles, RedirectURIs: p.RedirectURIs, PostLogoutRedirects: p.PostLogoutRedirects, LoginBaseURI: os.Getenv("PUBLIC_ISSUER") + "/signin"})

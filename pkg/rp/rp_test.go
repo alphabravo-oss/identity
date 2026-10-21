@@ -33,7 +33,7 @@ func setup(t testing.TB, claim string) *fixture {
 	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.requests.Add(1)
 		if f.fail.Load() {
-			http.Error(w, "unavailable", 503)
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
 		_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "one", Use: "sig", Algorithm: "RS256"}}})

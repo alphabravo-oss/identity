@@ -33,7 +33,7 @@ func (p Product) Validate() error {
 	}
 	for _, s := range append(append([]string{}, p.RedirectURIs...), p.PostLogoutRedirects...) {
 		u, e := url.Parse(s)
-		if e != nil || u.Host == "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
+		if e != nil || u.Host == "" || u.Fragment != "" || (u.Scheme != "https" && (u.Scheme != "http" || u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1")) {
 			return fmt.Errorf("%s: invalid redirect", p.Slug)
 		}
 	}

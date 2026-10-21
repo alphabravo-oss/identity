@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/alphabravo-oss/identity/internal/registry"
 	"log"
 	"net"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alphabravo-oss/identity/internal/registry"
 )
 
 var cookieCipher cipher.AEAD
@@ -114,7 +115,7 @@ func protect(next http.Handler) http.Handler {
 			origin := r.Header.Get("Origin")
 			public, _ := url.Parse(base)
 			if origin != "" && origin != public.Scheme+"://"+public.Host {
-				http.Error(w, "Invalid request origin", 403)
+				http.Error(w, "Invalid request origin", http.StatusForbidden)
 				return
 			}
 			if err := r.ParseForm(); err != nil {
@@ -124,7 +125,7 @@ func protect(next http.Handler) http.Handler {
 			c, err := getCookie(r, "ab_csrf")
 			csrf := r.FormValue("csrf")
 			if err != nil || csrf == "" || subtle.ConstantTimeCompare([]byte(c.Value), []byte(csrf)) != 1 {
-				http.Error(w, "Expired form. Reload and try again.", 403)
+				http.Error(w, "Expired form. Reload and try again.", http.StatusForbidden)
 				return
 			}
 			host, _, _ := net.SplitHostPort(r.RemoteAddr)
@@ -149,7 +150,7 @@ func protect(next http.Handler) http.Handler {
 			limits.Unlock()
 			if limited {
 				w.Header().Set("Retry-After", "60")
-				http.Error(w, "Too many attempts. Try again shortly.", 429)
+				http.Error(w, "Too many attempts. Try again shortly.", http.StatusTooManyRequests)
 				return
 			}
 		}

@@ -58,7 +58,7 @@ func main() {
 	mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
 		state, pkce := random(), oauth2.GenerateVerifier()
 		cookie(w, "ab_flow", state+"."+pkce, 300)
-		http.Redirect(w, r, cfg.AuthCodeURL(state, oauth2.S256ChallengeOption(pkce)), 302)
+		http.Redirect(w, r, cfg.AuthCodeURL(state, oauth2.S256ChallengeOption(pkce)), http.StatusFound)
 	})
 	mux.HandleFunc("GET /callback", func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie("ab_flow")
@@ -77,26 +77,26 @@ func main() {
 		token, err := cfg.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(pkce))
 		if err != nil {
 			log.Print(err)
-			http.Error(w, "Sign-in failed", 502)
+			http.Error(w, "Sign-in failed", http.StatusBadGateway)
 			return
 		}
 		if _, err = verifier.Verify(token.AccessToken); err != nil {
 			log.Print(err)
-			http.Error(w, "Invalid token", 401)
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
 		cookie(w, "ab_token", token.AccessToken, 600)
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie("ab_token")
 		if err != nil {
-			http.Redirect(w, r, "/login", 302)
+			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
 		i, err := verifier.Verify(c.Value)
 		if err != nil {
-			http.Redirect(w, r, "/login", 302)
+			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

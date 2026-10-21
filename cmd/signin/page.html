@@ -82,6 +82,8 @@ details summary { list-style: none; } details summary::-webkit-details-marker { 
   <form method="post" action="/signin/enroll"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><label for="code">Verification code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" required><button>Verify</button></form>
   {{else if eq .Step "passkey"}}
   <h1>Use your passkey</h1><p class="sub">Follow your device's instructions.</p><form id="passkey" method="post" action="/signin/passkey/finish"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><input type="hidden" name="assertion"><input type="hidden" id="options" value="{{.Options}}"><button type="button" id="passkey-button">Continue with passkey</button><p id="passkey-error" role="alert"></p></form><script src="/signin/static/passkey.js"></script>
+  {{else if eq .Step "invite"}}
+  <h1>You're invited</h1><p class="sub">Accept your invitation to set up your account.</p><form method="post" action="/signin/invite"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="userId" value="{{.UserID}}"><input type="hidden" name="code" value="{{.Code}}"><button>Accept invitation</button></form>
   {{else if eq .Step "reset"}}
   <h1>Reset your password</h1><p class="sub">We'll send a link if the account exists.</p><form method="post" action="/signin/reset"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="email">Username or email</label><input id="email" name="username" autocomplete="username" required><button>Send reset link</button></form>
   {{else if eq .Step "reset-sent"}}

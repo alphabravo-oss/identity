@@ -10,6 +10,12 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ .Values.database.name }}
+  annotations:
+    helm.sh/resource-policy: keep
+    {{- if .Release.IsInstall }}
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-5"
+    {{- end }}
 spec:
   instances: {{ .Values.database.instances }}
   imageName: {{ .Values.database.image | quote }}
@@ -28,7 +34,12 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ .Values.zitadel.zitadel.masterkeySecretName }}
-  annotations: {helm.sh/resource-policy: keep}
+  annotations:
+    helm.sh/resource-policy: keep
+    {{- if .Release.IsInstall }}
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-5"
+    {{- end }}
 type: Opaque
 data:
   masterkey: {{ if $old }}{{ index $old.data "masterkey" }}{{ else }}{{ randAlphaNum 32 | b64enc }}{{ end }}

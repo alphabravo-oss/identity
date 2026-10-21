@@ -66,7 +66,7 @@ func (c *Client) request(ctx context.Context, method, path string, in, out any) 
 	if err != nil {
 		return 0, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 300 {
 		return res.StatusCode, fmt.Errorf("secret API: %d", res.StatusCode)
 	}

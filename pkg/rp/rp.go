@@ -149,12 +149,12 @@ func (v *Verifier) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		scheme, raw, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 		if !ok || !strings.EqualFold(scheme, "Bearer") {
-			http.Error(w, "Authentication required", 401)
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
 			return
 		}
 		i, err := v.Verify(raw)
 		if err != nil {
-			http.Error(w, "Invalid or expired token", 401)
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, i)))

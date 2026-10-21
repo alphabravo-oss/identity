@@ -14,8 +14,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/alphabravo-oss/identity/internal/claims"
-	"github.com/alphabravo-oss/identity/internal/registry"
 	"html/template"
 	"io"
 	"log"
@@ -27,6 +25,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/alphabravo-oss/identity/internal/claims"
+	"github.com/alphabravo-oss/identity/internal/registry"
 )
 
 //go:embed static page.html
@@ -67,6 +68,8 @@ func main() {
 	mux.HandleFunc("POST /signin/passkey/start", passkeyStart)
 	mux.HandleFunc("POST /signin/passkey/finish", passkeyFinish)
 	mux.HandleFunc("GET /signin/reset", resetPage)
+	mux.HandleFunc("GET /signin/invite", invitePage)
+	mux.HandleFunc("POST /signin/invite", inviteAccept)
 	mux.HandleFunc("POST /signin/reset", resetRequest)
 	mux.HandleFunc("POST /signin/reset/finish", resetFinish)
 	mux.HandleFunc("POST /signin/enroll", enrollTOTP)
@@ -184,7 +187,9 @@ func ldap(w http.ResponseWriter, r *http.Request) {
 
 func startRedirectIDP(w http.ResponseWriter, r *http.Request) {
 	ar := r.URL.Query().Get("authRequest")
-	back := base + "/idp/done?authRequest=" + url.QueryEscape(ar)
+	state := randomToken()
+	setCookie(w, "ab_federation", ar+"."+state, 300)
+	back := base + "/idp/done?authRequest=" + url.QueryEscape(ar) + "&state=" + url.QueryEscape(state)
 	var res struct {
 		AuthURL  string `json:"authUrl"`
 		FormData *struct {
@@ -207,6 +212,12 @@ func startRedirectIDP(w http.ResponseWriter, r *http.Request) {
 
 func idpDone(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	c, err := getCookie(r, "ab_federation")
+	if err != nil || c.Value != q.Get("authRequest")+"."+q.Get("state") {
+		fail(w, r, errors.New("invalid federation state"))
+		return
+	}
+	setCookie(w, "ab_federation", "", -1)
 	if q.Get("id") == "" {
 		render(w, r, view{Step: "login", AuthRequest: q.Get("authRequest"), Err: "Sign-in with your organization was cancelled or failed."})
 		return
@@ -482,7 +493,7 @@ func rpc(method string, in, out any) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(res.Body, 2<<20))
 	if err != nil {
 		return err

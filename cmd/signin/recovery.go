@@ -130,3 +130,20 @@ func passkeyFinish(w http.ResponseWriter, r *http.Request) {
 	setCookie(w, "ab_pending", "", -1)
 	done(w, r, r.FormValue("authRequest"), &session{ID: id, Token: out.SessionToken})
 }
+
+func invitePage(w http.ResponseWriter, r *http.Request) {
+	render(w, r, view{Step: "invite", UserID: r.URL.Query().Get("userId"), Code: r.URL.Query().Get("code")})
+}
+func inviteAccept(w http.ResponseWriter, r *http.Request) {
+	uid := r.FormValue("userId")
+	if err := rpc("zitadel.user.v2.UserService/VerifyInviteCode", map[string]string{"userId": uid, "verificationCode": r.FormValue("code")}, &struct{}{}); err != nil {
+		fail(w, r, err)
+		return
+	}
+	var out struct{ VerificationCode string }
+	if err := rpc("zitadel.user.v2.UserService/PasswordReset", map[string]any{"userId": uid, "returnCode": map[string]any{}}, &out); err != nil {
+		fail(w, r, err)
+		return
+	}
+	render(w, r, view{Step: "reset-finish", UserID: uid, Code: out.VerificationCode})
+}
