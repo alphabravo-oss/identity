@@ -7,12 +7,12 @@ secretPrefix: identity-product-
 images:
   signin:
     repository: ghcr.io/alphabravo-oss/identity/signin
-    tag: 0.1.1
+    tag: 0.1.2
     digest: sha256:6cf45d8717164851c12bdc815afab6541b9c2490d55fe8ff8789b26ec6cc8897
   bootstrap:
     repository: ghcr.io/alphabravo-oss/identity/bootstrap
-    tag: 0.1.1
-    digest: sha256:7128650813663d15185ed1da3024230cec3a52302701f1bc9ca7b3f41eb397c9
+    tag: 0.1.2
+    digest: sha256:7c07175c28530a87b85bc1d02a2b701e511204efc6da2743c1e54ab07edb1a88
 signin:
   replicas: 2
   requireTOTP: true
@@ -52,7 +52,7 @@ zitadel:
   replicaCount: 2
   image:
     repository: ghcr.io/alphabravo-oss/identity/vendor-engine
-    tag: 0.1.1@sha256:c4957b4e4a3e96507a4838e15badaea4bbd5a10f2ad262fcfabd2d59736ba83c
+    tag: 0.1.2@sha256:c4957b4e4a3e96507a4838e15badaea4bbd5a10f2ad262fcfabd2d59736ba83c
   tools:
     wait4x:
       image:
@@ -200,4 +200,4 @@ zitadel:
     machinekeyWriter:
       image:
         repository: ghcr.io/alphabravo-oss/identity/vendor-kubectl
-        tag: 0.1.1@sha256:7d40f649a3d7fe6cdce43b27bec1f46495732a7b8a806a2bca51c0bd68ca2c61
+        tag: 0.1.2@sha256:7d40f649a3d7fe6cdce43b27bec1f46495732a7b8a806a2bca51c0bd68ca2c61

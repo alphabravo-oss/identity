@@ -115,7 +115,7 @@ user invitations and is deliberately absent from product OIDC credentials. The
 public invitation form verifies the single-use invite code before password setup.
 
 
-## Server-side product sessions (v0.1.1)
+## Server-side product sessions (v0.1.2)
 
 Products that already own opaque sessions can use the shared verifier without the
 Web cookie handlers. Identity exposes immutable `Email()`, `Name()`, `Nonce()` and
