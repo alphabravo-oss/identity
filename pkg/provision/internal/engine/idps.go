@@ -86,13 +86,13 @@ func ConfigureSAMLProvider(ctx context.Context, c *client.Client, org string, s 
 		func(ctx context.Context, m mgmt.ManagementServiceClient) (string, error) {
 			r, err := m.AddSAMLProvider(ctx, &mgmt.AddSAMLProviderRequest{Name: s.Name,
 				Metadata: &mgmt.AddSAMLProviderRequest_MetadataUrl{MetadataUrl: s.MetadataURL},
-				Binding:  idp.SAMLBinding_SAML_BINDING_POST, WithSignedRequest: true, NameIdFormat: &persistent, ProviderOptions: jit})
+				Binding:  idp.SAMLBinding_SAML_BINDING_POST, WithSignedRequest: true, SignatureAlgorithm: idp.SAMLSignatureAlgorithm_SAML_SIGNATURE_RSA_SHA256, NameIdFormat: &persistent, ProviderOptions: jit})
 			return r.GetId(), err
 		},
 		func(ctx context.Context, m mgmt.ManagementServiceClient, id string) error {
 			_, err := m.UpdateSAMLProvider(ctx, &mgmt.UpdateSAMLProviderRequest{Id: id, Name: s.Name,
 				Metadata: &mgmt.UpdateSAMLProviderRequest_MetadataUrl{MetadataUrl: s.MetadataURL},
-				Binding:  idp.SAMLBinding_SAML_BINDING_POST, WithSignedRequest: true, NameIdFormat: &persistent, ProviderOptions: jit})
+				Binding:  idp.SAMLBinding_SAML_BINDING_POST, WithSignedRequest: true, SignatureAlgorithm: idp.SAMLSignatureAlgorithm_SAML_SIGNATURE_RSA_SHA256, NameIdFormat: &persistent, ProviderOptions: jit})
 			return err
 		})
 }

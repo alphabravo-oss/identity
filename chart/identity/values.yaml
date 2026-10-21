@@ -1,9 +1,5 @@
 providers:
-  existingSecret: ""
-global:
-  identity:
-    domain: identity.example.com
-    otpIssuer: AlphaBravo
+  existingSecret: ''
 products: []
 organization: AlphaBravo
 secretPrefix: identity-product-
