@@ -184,7 +184,7 @@ func protect(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
-		if r.Method == http.MethodPost {
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/signin/") {
 			r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 			origin := r.Header.Get("Origin")
 			public, _ := url.Parse(base)

@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
@@ -166,6 +169,17 @@ func run(ctx context.Context) error {
 			return err
 		}
 		data["mail-token"] = []byte(hex.EncodeToString(b))
+	}
+	if len(data["saml-branding-key"]) == 0 {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return err
+		}
+		der, err := x509.MarshalPKCS8PrivateKey(key)
+		if err != nil {
+			return err
+		}
+		data["saml-branding-key"] = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
 	}
 	target := string(data["target-id"])
 	if target == "" {

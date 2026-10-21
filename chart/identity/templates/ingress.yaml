@@ -15,12 +15,12 @@ spec:
           - path: /.well-known/openid-configuration
             pathType: Exact
             backend: {service: {name: {{ .Values.zitadel.fullnameOverride }}, port: {number: 8080}}}
-          {{- range list "/oauth/v2" "/oidc/v1" "/idps" }}
+          {{- range list "/oauth/v2" "/oidc/v1" }}
           - path: {{ . }}
             pathType: Prefix
             backend: {service: {name: {{ $.Values.zitadel.fullnameOverride }}, port: {number: 8080}}}
           {{- end }}
-          {{- range list "/signin" "/logout/done" }}
+          {{- range list "/signin" "/logout/done" "/idps" }}
           - path: {{ . }}
             pathType: Prefix
             backend: {service: {name: {{ include "identity.name" $ }}-signin, port: {number: 8080}}}

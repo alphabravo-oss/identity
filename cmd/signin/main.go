@@ -60,7 +60,9 @@ type view struct {
 func main() {
 	loadConfig()
 	initCipher()
+	initSAMLBranding()
 	mux := http.NewServeMux()
+	mux.Handle("/idps/", idpCallbacks())
 	mux.Handle("GET /signin/static/", http.StripPrefix("/signin", http.FileServerFS(assets)))
 	mux.HandleFunc("GET /signin/login", loginPage)
 	mux.HandleFunc("POST /signin/password", password)
@@ -221,6 +223,10 @@ func startRedirectIDP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if res.FormData != nil { // SAML POST binding: we render the auto-submitting form ourselves
+		if err := normalizeSAMLForm(res.FormData.Fields); err != nil {
+			fail(w, r, err)
+			return
+		}
 		render(w, r, view{Step: "post", PostURL: res.FormData.URL, PostFields: res.FormData.Fields})
 		return
 	}
