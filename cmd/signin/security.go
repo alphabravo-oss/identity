@@ -218,7 +218,7 @@ func protect(next http.Handler) http.Handler {
 		// Hide file-server listings and source files; static resources are an explicit allowlist.
 		if strings.HasPrefix(r.URL.Path, "/signin/static/") {
 			switch r.URL.Path {
-			case "/signin/static/inter.woff2", "/signin/static/tokens.css", "/signin/static/autopost.js", "/signin/static/passkey.js":
+			case "/signin/static/inter.woff2", "/signin/static/tokens.css", "/signin/static/marks/astronomer.svg", "/signin/static/marks/constellation.svg", "/signin/static/autopost.js", "/signin/static/passkey.js":
 			default:
 				http.NotFound(w, r)
 				return

@@ -23,13 +23,14 @@ body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; letter-spacing: -0.01em; margin-bottom: 28px; }
 .brand svg { color: var(--accent); }
 h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 4px; }
+a:not(.btn) { color: var(--accent); text-underline-offset: 3px; }
 p.sub { color: var(--muted-text); margin: 0 0 24px; }
 label { display: block; font-size: 13px; font-weight: 550; margin: 14px 0 6px; }
 input { width: 100%; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--text); font: inherit; }
 input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 button, .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin-top: 20px; border: 0; border-radius: 8px;
   background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
-.btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); margin-top: 10px; font-weight: 550; }
+.btn.secondary, button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); margin-top: 10px; font-weight: 550; }
 .sep { display: flex; align-items: center; gap: 12px; color: var(--muted-text); font-size: 12px; margin: 24px 0 4px; }
 .sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .err { background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-bottom: 8px; }
@@ -40,12 +41,8 @@ details summary { list-style: none; } details summary::-webkit-details-marker { 
 <body>
 <main class="card">
   <div class="brand">
-    {{if eq .Brand.Product "Constellation"}}
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 18 9 7l6 5 5-7"/><circle cx="4" cy="18" r="2" fill="currentColor"/><circle cx="9" cy="7" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="20" cy="5" r="2" fill="currentColor"/></svg>
-    {{else}}
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-25 12 12)"/></svg>
-    {{end}}
-    {{if .Brand.Logo}}<img src="{{.Brand.Logo}}" width="26" height="26" alt="">{{end}}<span>{{.Brand.Product}}</span>
+    {{if .Brand.Logo}}<img src="{{.Brand.Logo}}" width="26" height="26" alt="">{{else}}<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 2 9 5v6c0 5-9 9-9 9s-9-4-9-9V7z"/><path d="m8 12 3 3 5-6"/></svg>{{end}}
+    <span>{{.Brand.Product}}</span>
   </div>
 
   {{if eq .Step "login"}}
@@ -60,7 +57,9 @@ details summary { list-style: none; } details summary::-webkit-details-marker { 
     <button type="submit">Continue</button>
   </form>
   <p><a href="/signin/reset">Forgot your password?</a></p>
-  <form method="post" action="/signin/passkey/start"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><label for="pk-user">Passkey username</label><input id="pk-user" name="username" autocomplete="username webauthn" required><button class="secondary" type="submit">Use a passkey</button></form>
+  <details><summary class="btn secondary">Use a passkey</summary>
+  <form method="post" action="/signin/passkey/start"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><label for="pk-user">Passkey username</label><input id="pk-user" name="username" autocomplete="username webauthn" required><button class="secondary" type="submit">Continue with passkey</button></form>
+  </details>
   <div class="sep">or</div>
   {{if .IDPs.oidc}}<a class="btn secondary" id="sso-oidc" href="/signin/idp/oidc?authRequest={{.AuthRequest}}">Continue with Corp SSO</a>{{end}}
   {{if .IDPs.saml}}<a class="btn secondary" id="sso-saml" href="/signin/idp/saml?authRequest={{.AuthRequest}}">Continue with Corp SSO (SAML)</a>{{end}}
