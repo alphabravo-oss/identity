@@ -18,7 +18,8 @@ fmt:
 	gofmt -w cmd internal pkg examples
 security:
 	govulncheck ./...
-	gosec -quiet ./...
+	cd tools/security && go build -mod=mod -o ../../bin/gosec github.com/securego/gosec/v2/cmd/gosec
+	./bin/gosec -quiet ./...
 images:
 	VERSION=$(VERSION) ./scripts/build-images.sh
 helm-lint:

@@ -144,8 +144,34 @@ type bucket struct {
 
 var limits = struct {
 	sync.Mutex
-	entries map[string]bucket
-}{entries: map[string]bucket{}}
+	entries map[[32]byte]bucket
+	swept   time.Time
+}{entries: map[[32]byte]bucket{}}
+
+func allowAttempt(key string, max int) bool {
+	hash := sha256.Sum256([]byte(key))
+	now := time.Now()
+	limits.Lock()
+	defer limits.Unlock()
+	if now.Sub(limits.swept) > time.Minute {
+		for k, v := range limits.entries {
+			if now.Sub(v.start) > time.Minute {
+				delete(limits.entries, k)
+			}
+		}
+		limits.swept = now
+	}
+	b, exists := limits.entries[hash]
+	if !exists && len(limits.entries) >= 10000 {
+		return false
+	}
+	if now.Sub(b.start) > time.Minute {
+		b = bucket{start: now}
+	}
+	b.n++
+	limits.entries[hash] = b
+	return b.n <= max
+}
 
 func protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -173,25 +199,16 @@ func protect(next http.Handler) http.Handler {
 				return
 			}
 			host, _, _ := net.SplitHostPort(r.RemoteAddr)
-			limits.Lock()
-			now := time.Now()
-			b := limits.entries[host]
-			if now.Sub(b.start) > time.Minute {
-				b = bucket{start: now}
-			}
-			b.n++
-			if len(limits.entries) > 10000 {
-				for k, v := range limits.entries {
-					if now.Sub(v.start) > time.Minute {
-						delete(limits.entries, k)
-					}
+			account := strings.ToLower(r.FormValue("username"))
+			if account == "" {
+				if pending, e := getCookie(r, "ab_pending"); e == nil {
+					account, _, _ = strings.Cut(pending.Value, ".")
+				} else {
+					account = csrf
 				}
 			}
-			if len(limits.entries) < 10000 {
-				limits.entries[host] = b
-			}
-			limited := b.n > 30
-			limits.Unlock()
+			limited := !allowAttempt("peer:"+host, 300) || !allowAttempt("form:"+r.URL.Path+":"+account, 30)
+
 			if limited {
 				w.Header().Set("Retry-After", "60")
 				http.Error(w, "Too many attempts. Try again shortly.", http.StatusTooManyRequests)
