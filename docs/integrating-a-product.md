@@ -35,6 +35,26 @@ if err != nil { return err }
 router.Handle("/api/", verifier.Middleware(apiHandler))
 ```
 
+For browser sign-in, delegate the entire code flow to the same package:
+
+```go
+web, err := rp.NewWeb(ctx, rp.WebConfig{
+    Config: rp.Config{Issuer: issuer, Audience: clientID,
+        JWKSURL: issuer + "/oauth/v2/keys", Product: "wolf"},
+    ClientSecret: clientSecret, RedirectURI: "https://wolf.example.com/callback",
+})
+if err != nil { return err }
+mux.HandleFunc("GET /login", web.Login)
+mux.HandleFunc("GET /callback", web.Callback)
+mux.Handle("GET /", web.Session(productPage))
+```
+
+The library owns PKCE, browser-bound state, token exchange and secure HttpOnly session
+cookies. Products retain their normal CSRF protection on state-changing routes.
+For external providers also set `AuthorizationURL` and `TokenURL` from trusted discovery.
+The browser cookie token budget is 3,800 bytes; larger external tokens need the product's
+server-side session store, while bearer verification supports up to 32 KiB.
+
 Read `rp.FromContext(r.Context())`, then `HasRole`. Authorization remains Wolf's
 responsibility. Missing roles grant no permissions. The verifier pins issuer, audience
 and signing algorithms, rejects expired tokens and keeps a bounded 10,000-token memo.
