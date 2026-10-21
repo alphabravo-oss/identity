@@ -37,7 +37,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "identity.name" . }}-bootstrap
       restartPolicy: OnFailure
-      securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532}
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: bootstrap
           image: {{ include "identity.image" .Values.images.bootstrap | quote }}

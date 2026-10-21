@@ -153,3 +153,8 @@ The engine source is v4.19.5 at a618740b578627b7b9acbbb111a6948882d6f5dc,
 with security-only x/net and x/crypto updates. The private management-console SPA
 is omitted; public UI remains the signin service. All published images are
 scanned and signed, including these vendor mirrors.
+
+Chart 0.1.3 sets restricted Pod Security defaults (RuntimeDefault seccomp, no
+privilege escalation, dropped capabilities and read-only roots) for runtime and
+setup Pods. The underlying service/vendor images remain at their qualified
+0.1.2 digests.
