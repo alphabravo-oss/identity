@@ -120,9 +120,18 @@ func idpCallbacks() http.Handler {
 	if err != nil {
 		log.Fatal("invalid internal API address")
 	}
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	director := proxy.Director
-	proxy.Director = func(r *http.Request) { director(r); r.Host = apiHost; r.Header.Set("Accept-Encoding", "identity") }
+	host := apiHost
+	if host == "" {
+		host = target.Host
+	}
+	proxy := &httputil.ReverseProxy{Rewrite: func(request *httputil.ProxyRequest) {
+		request.SetURL(target)
+		request.Out.Host = host
+		request.SetXForwarded()
+		request.Out.Header.Set("X-Forwarded-Host", host)
+		request.Out.Header.Set("X-Forwarded-Proto", "https")
+		request.Out.Header.Set("Accept-Encoding", "identity")
+	}}
 	proxy.ModifyResponse = func(res *http.Response) error {
 		if !strings.HasSuffix(res.Request.URL.Path, "/saml/metadata") || res.StatusCode != http.StatusOK {
 			return nil
