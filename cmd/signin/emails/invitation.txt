@@ -1,0 +1,9 @@
+You're invited to {{.Product}}
+
+Accept your invitation and choose your password:
+{{.Link}}
+
+You will be asked to protect your account with an authenticator or passkey.
+If you were not expecting this invitation, ignore it.
+
+AlphaBravo Identity

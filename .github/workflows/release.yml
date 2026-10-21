@@ -6,8 +6,6 @@ on:
         description: Image and chart version without v
         required: true
         default: 0.1.0
-  push:
-    tags: ['v*']
 permissions:
   contents: read
   packages: write

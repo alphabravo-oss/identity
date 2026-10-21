@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -159,6 +160,13 @@ func run(ctx context.Context) error {
 		}
 	}
 	// Persist the target signing key immediately: it is only returned on create.
+	if len(data["mail-token"]) == 0 {
+		b := make([]byte, 32)
+		if _, err = rand.Read(b); err != nil {
+			return err
+		}
+		data["mail-token"] = []byte(hex.EncodeToString(b))
+	}
 	target := string(data["target-id"])
 	if target == "" {
 		var res struct{ ID, SigningKey string }

@@ -30,7 +30,7 @@ import (
 	"github.com/alphabravo-oss/identity/internal/registry"
 )
 
-//go:embed static page.html
+//go:embed static page.html emails
 var assets embed.FS
 
 var (
@@ -83,7 +83,10 @@ func main() {
 	mux.HandleFunc("GET /logout/done", logout) // Zitadel's fallback after end_session without post_logout_redirect_uri
 	mux.HandleFunc("GET /signin/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })
 	srv := &http.Server{Addr: ":8080", Handler: protect(mux), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
-	internal := &http.Server{Addr: ":8090", Handler: claims.Handler([]byte(strings.TrimSpace(readFile(env("CLAIMS_KEY_FILE", "/runtime/claims-key"))))), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second}
+	internalMux := http.NewServeMux()
+	internalMux.Handle("POST /claims", claims.Handler([]byte(strings.TrimSpace(readFile(env("CLAIMS_KEY_FILE", "/runtime/claims-key"))))))
+	internalMux.HandleFunc("POST /invitations", invite)
+	internal := &http.Server{Addr: ":8090", Handler: internalMux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second}
 	go func() {
 		if err := internal.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

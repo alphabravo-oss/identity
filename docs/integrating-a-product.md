@@ -84,3 +84,12 @@ completion and the Secret volume update. Sign-in reloads the registry once per s
 and retains the last good configuration on read/parse failure. Active
 sessions survive because cookie keys and engine sessions remain stable. Place trusted
 private upstream CAs in the engine's mounted CA bundle. Provider logout remains separate.
+
+The private sign-in service also owns invitation email delivery. An operator may
+call `POST http://<release>-identity-signin:8090/invitations` using the bearer
+capability stored as `mail-token` in the runtime Secret. The JSON fields are
+`ClientID`, `Username`, `Email`, `GivenName`, and `FamilyName`. It creates an invited
+account and sends the product-branded invitation through the configured SMTP relay.
+Keep that capability in backend administration only; it permits organization-wide
+user invitations and is deliberately absent from product OIDC credentials. The
+public invitation form verifies the single-use invite code before password setup.

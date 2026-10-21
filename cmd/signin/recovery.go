@@ -33,7 +33,12 @@ func resetRequest(w http.ResponseWriter, r *http.Request) {
 		var code struct{ VerificationCode string }
 		if err = rpc("zitadel.user.v2.UserService/PasswordReset", map[string]any{"userId": u.UserID, "returnCode": map[string]any{}}, &code); err == nil {
 			link := base + "/reset?" + url.Values{"userId": {u.UserID}, "code": {code.VerificationCode}}.Encode()
-			err = sendMail(u.Human.Email.Email, "Reset your password", "Use this link to reset your password:\r\n\r\n"+link+"\r\n\r\nIf you did not request this, ignore this email.")
+			body, templateErr := mailBody("reset", "AlphaBravo", link)
+			if templateErr != nil {
+				err = templateErr
+			} else {
+				err = sendMail(u.Human.Email.Email, "Reset your password", body)
+			}
 		}
 		if err != nil {
 			log.Print("recovery delivery failed")

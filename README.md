@@ -34,3 +34,8 @@ requires an explicit rotation; reruns never silently replace it.
 See [integrating a product](docs/integrating-a-product.md), the
 [decisions](docs/decisions), and [air-gap operation](docs/air-gap.md).
 AGPL-3.0; see [LICENSE](LICENSE). The Inter Variable font is OFL-1.1.
+
+Releases use the manually dispatched `release` Actions workflow: test, build exactly
+two images, gate with Grype at High, push, keyless-sign image digests, pin and publish
+the OCI chart, and keyless-sign its digest. Complete live proof against those digests
+before creating the matching source tag; pushing the tag does not rebuild artifacts.

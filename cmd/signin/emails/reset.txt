@@ -1,0 +1,8 @@
+Reset your {{.Product}} password
+
+Use this link to reset your password:
+{{.Link}}
+
+If you did not request this, ignore this email.
+
+AlphaBravo Identity

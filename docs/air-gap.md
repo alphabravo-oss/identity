@@ -16,3 +16,9 @@ management for production. Rotate the dedicated login PAT before its one-year ex
 Certificate issuance, CNPG and monitoring operators are platform prerequisites and
 have their own image inventories. A public OIDC provider cannot work with its network
 blocked; offline federation requires an in-network provider.
+
+CNPG instances also need the internal Kubernetes API after a restart. The chart
+allows that only for the setup/bootstrap and database pods. Helm discovers API
+Endpoint addresses when it has read permission; offline/GitOps rendering should set
+`networkPolicy.apiServerCIDRs` explicitly to the API Service and post-DNAT endpoint
+addresses. This exception does not allow external egress from sign-in or the engine.

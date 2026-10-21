@@ -11,5 +11,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build if [ "$SERVICE" = bootstrap 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /service /service
 COPY --from=build /demo-product /demo-product
+LABEL org.opencontainers.image.source="https://github.com/alphabravo-oss/identity"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
 USER 65532:65532
 ENTRYPOINT ["/service"]

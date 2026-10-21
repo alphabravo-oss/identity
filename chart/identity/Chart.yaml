@@ -9,3 +9,7 @@ dependencies:
   - name: zitadel
     version: 10.4.0
     repository: https://charts.zitadel.com
+
+annotations:
+  org.opencontainers.image.source: https://github.com/alphabravo-oss/identity
+  org.opencontainers.image.licenses: AGPL-3.0
