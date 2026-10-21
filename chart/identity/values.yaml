@@ -7,12 +7,12 @@ secretPrefix: identity-product-
 images:
   signin:
     repository: ghcr.io/alphabravo-oss/identity/signin
-    tag: 0.1.0
-    digest: sha256:8e64ef08a2be1e6b058980889524de0b9a58ccedf758070ef87e6bd7f89e4938
+    tag: 0.1.1
+    digest: sha256:6cf45d8717164851c12bdc815afab6541b9c2490d55fe8ff8789b26ec6cc8897
   bootstrap:
     repository: ghcr.io/alphabravo-oss/identity/bootstrap
-    tag: 0.1.0
-    digest: sha256:2fa038dc8a57dc8ef86e9f12acaf424f0a068c61445b7222b4c514f666caa5b7
+    tag: 0.1.1
+    digest: sha256:7128650813663d15185ed1da3024230cec3a52302701f1bc9ca7b3f41eb397c9
 signin:
   replicas: 2
   requireTOTP: true
@@ -34,11 +34,16 @@ networkPolicy:
   enabled: true
   apiServerCIDRs:
   - 10.43.0.1/32
-  # Explicit ingress-controller peers; override for nginx or another controller.
   ingressPeers:
-    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
-      podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
-  ingressPorts: [{port: 8443}, {port: 8000}]
+  - namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: traefik
+  ingressPorts:
+  - port: 8443
+  - port: 8000
   databaseOperatorNamespace: cnpg-system
   upstreams: []
 monitoring:
@@ -46,7 +51,8 @@ monitoring:
 zitadel:
   replicaCount: 2
   image:
-    tag: v4.19.5@sha256:a586456a208e0db4c633db0ba43c427c24b37846138b8b13ff16ad8e003a18d3
+    repository: ghcr.io/alphabravo-oss/identity/vendor-engine
+    tag: 0.1.1@sha256:c4957b4e4a3e96507a4838e15badaea4bbd5a10f2ad262fcfabd2d59736ba83c
   tools:
     wait4x:
       image:
@@ -190,3 +196,8 @@ zitadel:
   fullnameOverride: identity-engine
   cleanupJob:
     enabled: false
+  setupJob:
+    machinekeyWriter:
+      image:
+        repository: ghcr.io/alphabravo-oss/identity/vendor-kubectl
+        tag: 0.1.1@sha256:7d40f649a3d7fe6cdce43b27bec1f46495732a7b8a806a2bca51c0bd68ca2c61
