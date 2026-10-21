@@ -22,7 +22,7 @@ func testCipher(t *testing.T) {
 }
 func TestCookieAuthentication(t *testing.T) {
 	testCipher(t)
-	value := seal("ab_session", "secret")
+	value := seal("ab_session", "secret", 3600)
 	r := httptest.NewRequest("GET", "/signin/login", nil)
 	r.AddCookie(&http.Cookie{Name: "ab_session", Value: value})
 	c, err := getCookie(r, "ab_session")
@@ -72,10 +72,25 @@ func TestNullOriginStillRequiresCSRF(t *testing.T) {
 	r := httptest.NewRequest("POST", "/signin/password", strings.NewReader("csrf=bound-token"))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Set("Origin", "null")
-	r.AddCookie(&http.Cookie{Name: "ab_csrf", Value: seal("ab_csrf", "bound-token")})
+	r.AddCookie(&http.Cookie{Name: "ab_csrf", Value: seal("ab_csrf", "bound-token", 3600)})
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusNoContent {
 		t.Fatal(w.Code)
+	}
+}
+
+func TestExpiredPendingCookieCannotBeReplayed(t *testing.T) {
+	testCipher(t)
+	r := httptest.NewRequest("GET", "/signin/totp", nil)
+	r.AddCookie(&http.Cookie{Name: "ab_pending", Value: seal("ab_pending", "opaque-session", -1)})
+	if _, err := getCookie(r, "ab_pending"); err == nil {
+		t.Fatal("expired pending cookie was accepted")
+	}
+}
+func TestActiveDirectoryGroupDN(t *testing.T) {
+	got := groups([]byte(`{"memberOf":["CN=Platform Admins,OU=Groups,DC=corp"]}`))
+	if !sameSet(got, []string{"Platform Admins"}) {
+		t.Fatal(got)
 	}
 }

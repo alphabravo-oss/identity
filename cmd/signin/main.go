@@ -406,7 +406,8 @@ func groups(raw json.RawMessage) []string {
 			case "groups":
 				out = append(out, t)
 			case "memberof", "profile":
-				if cn, ok := strings.CutPrefix(strings.Split(t, ",")[0], "cn="); ok {
+				attribute, cn, ok := strings.Cut(strings.Split(t, ",")[0], "=")
+				if ok && strings.EqualFold(strings.TrimSpace(attribute), "cn") {
 					out = append(out, cn)
 				}
 			}
@@ -545,7 +546,7 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func setCookie(w http.ResponseWriter, name, v string, maxAge int) {
-	http.SetCookie(w, &http.Cookie{Name: name, Value: seal(name, v), Path: "/signin", MaxAge: maxAge, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: name, Value: seal(name, v, maxAge), Path: "/signin", MaxAge: maxAge, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 }
 
 func cookieValue(c *http.Cookie, err error) string {

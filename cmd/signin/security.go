@@ -45,7 +45,11 @@ func randomToken() string {
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
 }
-func seal(name, value string) string {
+func seal(name, value string, maxAge int) string {
+	lifetime := 12 * time.Hour
+	if maxAge != 0 {
+		lifetime = time.Duration(maxAge) * time.Second
+	}
 	nonce := make([]byte, cookieCipher.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		panic(err)
@@ -53,7 +57,7 @@ func seal(name, value string) string {
 	b, _ := json.Marshal(struct {
 		Value string
 		Exp   int64
-	}{value, time.Now().Add(12 * time.Hour).Unix()})
+	}{value, time.Now().Add(lifetime).Unix()})
 	return base64.RawURLEncoding.EncodeToString(cookieCipher.Seal(nonce, nonce, b, []byte(name)))
 }
 func getCookie(r *http.Request, name string) (*http.Cookie, error) {
