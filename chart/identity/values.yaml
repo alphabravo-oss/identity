@@ -201,3 +201,12 @@ zitadel:
       image:
         repository: ghcr.io/alphabravo-oss/identity/vendor-kubectl
         tag: 0.1.2@sha256:7d40f649a3d7fe6cdce43b27bec1f46495732a7b8a806a2bca51c0bd68ca2c61
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL

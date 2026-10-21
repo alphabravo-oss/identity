@@ -17,7 +17,7 @@ spec:
       {{- end }}
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
-      securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532}
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: signin
           image: {{ include "identity.image" .Values.images.signin | quote }}
