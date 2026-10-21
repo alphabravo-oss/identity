@@ -61,11 +61,11 @@ details summary { list-style: none; } details summary::-webkit-details-marker { 
   <form method="post" action="/signin/passkey/start"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="authRequest" value="{{.AuthRequest}}"><label for="pk-user">Passkey username</label><input id="pk-user" name="username" autocomplete="username webauthn" required><button class="secondary" type="submit">Continue with passkey</button></form>
   </details>
   <div class="sep">or</div>
-  {{if .IDPs.oidc}}<a class="btn secondary" id="sso-oidc" href="/signin/idp/oidc?authRequest={{.AuthRequest}}">Continue with Corp SSO</a>{{end}}
-  {{if .IDPs.saml}}<a class="btn secondary" id="sso-saml" href="/signin/idp/saml?authRequest={{.AuthRequest}}">Continue with Corp SSO (SAML)</a>{{end}}
+  {{if .IDPs.oidc}}<a class="btn secondary" id="sso-oidc" href="/signin/idp/oidc?authRequest={{.AuthRequest}}">Continue with single sign-on</a>{{end}}
+  {{if .IDPs.saml}}<a class="btn secondary" id="sso-saml" href="/signin/idp/saml?authRequest={{.AuthRequest}}">Continue with SAML sign-on</a>{{end}}
   {{if .IDPs.ldap}}
   <details>
-    <summary class="btn secondary" id="ldap-toggle">Continue with Acme Directory</summary>
+    <summary class="btn secondary" id="ldap-toggle">Continue with your directory</summary>
     <form method="post" action="/signin/ldap">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
     <input type="hidden" name="authRequest" value="{{.AuthRequest}}">

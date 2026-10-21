@@ -22,3 +22,8 @@ allows that only for the setup/bootstrap and database pods. Helm discovers API
 Endpoint addresses when it has read permission; offline/GitOps rendering should set
 `networkPolicy.apiServerCIDRs` explicitly to the API Service and post-DNAT endpoint
 addresses. This exception does not allow external egress from sign-in or the engine.
+
+Uninstall retains the database and immutable master key. On reinstall, existing
+retained resources are adopted without running destructive pre-install hooks against
+them. A pre-existing master-key Secret managed outside this release is consumed without
+claiming ownership. Its `masterkey` data must be exactly 32 bytes and backed up.

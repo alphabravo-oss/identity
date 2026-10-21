@@ -6,6 +6,7 @@ data:
   products.json: {{ .Values.products | toJson | quote }}
 ---
 {{- if .Values.database.create }}
+{{- $db := lookup "postgresql.cnpg.io/v1" "Cluster" .Release.Namespace .Values.database.name }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -15,7 +16,7 @@ metadata:
     meta.helm.sh/release-name: {{ .Release.Name }}
     meta.helm.sh/release-namespace: {{ .Release.Namespace }}
     helm.sh/resource-policy: keep
-    {{- if .Release.IsInstall }}
+    {{- if and .Release.IsInstall (not $db) }}
     helm.sh/hook: pre-install
     helm.sh/hook-weight: "-5"
     {{- end }}
@@ -33,6 +34,8 @@ spec:
 ---
 {{- end }}
 {{- $old := lookup "v1" "Secret" .Release.Namespace .Values.zitadel.zitadel.masterkeySecretName }}
+{{- $owned := and $old (eq (index (default dict $old.metadata.annotations) "meta.helm.sh/release-name") .Release.Name) }}
+{{- if or (not $old) $owned }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -42,7 +45,7 @@ metadata:
     meta.helm.sh/release-name: {{ .Release.Name }}
     meta.helm.sh/release-namespace: {{ .Release.Namespace }}
     helm.sh/resource-policy: keep
-    {{- if .Release.IsInstall }}
+    {{- if and .Release.IsInstall (not $old) }}
     helm.sh/hook: pre-install
     helm.sh/hook-weight: "-5"
     {{- end }}
@@ -50,3 +53,5 @@ type: Opaque
 immutable: true
 data:
   masterkey: {{ if $old }}{{ index $old.data "masterkey" }}{{ else }}{{ randAlphaNum 32 | b64enc }}{{ end }}
+
+{{- end }}
